@@ -1,0 +1,148 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="using:BlueHeighliner.Bundler"
+        x:Class="BlueHeighliner.Bundler.MainWindow"
+        x:DataType="app:IMainViewModel"
+        Title="Bundler"
+        Width="1180"
+        Height="760"
+        MinWidth="820"
+        MinHeight="520"
+        WindowDecorations="BorderOnly"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Background}">
+  <Grid RowDefinitions="*,Auto,210,22">
+    <Grid Grid.Row="0" ColumnDefinitions="300,Auto,*">
+      <Border Grid.Column="0" Classes="panel" MinWidth="220">
+        <Grid RowDefinitions="Auto,*">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="12,8,6,6">
+            <TextBlock Grid.Column="0" Text="BUNDLES" Classes="header" VerticalAlignment="Center" />
+            <Button Name="SelectAll" Grid.Column="1" Classes="icon" ToolTip.Tip="Tick all" IsEnabled="{Binding !IsBusy}">
+              <Path Classes="lineIcon" Data="{StaticResource SelectAllIconGeometry}" Width="14" Height="14" />
+            </Button>
+            <Button Name="SelectNone" Grid.Column="2" Classes="icon" ToolTip.Tip="Untick all" IsEnabled="{Binding !IsBusy}">
+              <Path Classes="lineIcon" Data="{StaticResource SelectNoneIconGeometry}" Width="14" Height="14" />
+            </Button>
+            <Button Name="Refresh" Grid.Column="3" Classes="icon" ToolTip.Tip="Refresh" IsEnabled="{Binding CanRefresh}">
+              <Path Classes="lineIcon" Data="{StaticResource RefreshIconGeometry}" Width="14" Height="14" />
+            </Button>
+          </Grid>
+          <ListBox Name="List" Grid.Row="1" ItemsSource="{Binding Bundles}" SelectedItem="{Binding Current}" IsEnabled="{Binding !IsBusy}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="app:BundleRowViewModel">
+                <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="26">
+                  <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="16,0,10,0" TextTrimming="CharacterEllipsis" />
+                  <Border Grid.Column="2" Classes="badge" Tag="{Binding Kind}" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding Badge}" />
+                  </Border>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Width="1" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" />
+
+      <Grid Grid.Column="2" RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Classes="topbar" Padding="12,0,0,0" PointerPressed="OnTopBarPointerPressed">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" Margin="0,8">
+            <Button Name="Build" Classes="primary" Content="Build" ToolTip.Tip="Download the latest versions into a bundle file (online computer)" IsEnabled="{Binding CanBuild}" />
+            <Button Name="Install" Classes="primary" Content="Install" ToolTip.Tip="Install the bundle file from the bundles folder (offline computer)" IsEnabled="{Binding CanInstall}" />
+            <Button Name="Uninstall" Content="Uninstall" IsEnabled="{Binding CanInstall}" />
+            <Button Name="Reinstall" Content="Reinstall" ToolTip.Tip="Uninstall the ticked bundles that are installed, then install them from their files" IsEnabled="{Binding CanInstall}" />
+            <Button Name="Cancel" Classes="danger" Content="Cancel" IsEnabled="{Binding IsBusy}" />
+            </StackPanel>
+            <app:WindowControlsView Grid.Column="2" />
+          </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="28,22,28,20" Spacing="16">
+            <Border Background="#4D8A5A00" CornerRadius="2" Padding="10,8" IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" />
+            </Border>
+
+            <StackPanel Spacing="16" IsVisible="{Binding HasCurrent}">
+              <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="14">
+                  <TextBlock Text="{Binding Current.Name}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <Border Classes="badge" Tag="{Binding Current.Kind}">
+                    <TextBlock Text="{Binding Current.Badge}" />
+                  </Border>
+                </StackPanel>
+                <TextBlock Text="{Binding Current.Description}" Classes="muted" TextWrapping="Wrap" />
+              </StackPanel>
+              <Grid ColumnDefinitions="110,*" RowDefinitions="28,28,28" Margin="0,4,0,0">
+                <TextBlock Grid.Row="0" Text="Target" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Current.Target}" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Text="Bundle File" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Current.BundleFile}" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="2" Text="Dependencies" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Current.Dependencies}" VerticalAlignment="Center" />
+              </Grid>
+
+              <StackPanel Spacing="0" Margin="0,18,0,0" IsEnabled="{Binding !IsBusy}">
+                <Grid ColumnDefinitions="2*,1.3*,4*,2.2*,4*" Margin="0,0,0,6">
+                  <TextBlock Grid.Column="0" Text="SERVICE" Classes="header" />
+                  <TextBlock Grid.Column="1" Text="VERSION" Classes="header" />
+                  <TextBlock Grid.Column="2" Text="DESCRIPTION" Classes="header" />
+                  <TextBlock Grid.Column="3" Text="LICENSE" Classes="header" />
+                  <TextBlock Grid.Column="4" Text="USAGE" Classes="header" />
+                </Grid>
+                <ItemsControl ItemsSource="{Binding Current.Services}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="app:ServiceRow">
+                      <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="0,8">
+                        <Grid ColumnDefinitions="2*,1.3*,4*,2.2*,4*">
+                          <TextBlock Grid.Column="0" Text="{Binding Service}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,14,0" />
+                          <TextBlock Grid.Column="1" Text="{Binding Version}" TextWrapping="Wrap" Margin="0,0,14,0" />
+                          <TextBlock Grid.Column="2" Text="{Binding Description}" TextWrapping="Wrap" Margin="0,0,14,0" />
+                          <ItemsControl Grid.Column="3" ItemsSource="{Binding Links}" Margin="0,0,14,0">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="app:LicenseLink">
+                                <Button Classes="link" Content="{Binding Id}" Click="OnLicenseClick" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock Grid.Column="4" Text="{Binding Usage}" TextWrapping="Wrap" Classes="muted" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </StackPanel>
+
+            <TextBlock Text="No bundles" Classes="muted" IsVisible="{Binding !HasCurrent}" />
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Grid>
+
+    <GridSplitter Grid.Row="1" Height="1" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" HorizontalAlignment="Stretch" />
+
+    <Grid Grid.Row="2" RowDefinitions="Auto,2,*" Background="{DynamicResource Background}">
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="12,4,6,2">
+        <TextBlock Grid.Column="0" Text="OUTPUT" Classes="header" VerticalAlignment="Center" />
+        <Button Name="ClearLog" Grid.Column="2" Classes="icon" ToolTip.Tip="Clear output" IsEnabled="{Binding !IsBusy}">
+          <Path Classes="lineIcon" Data="{StaticResource ClearIconGeometry}" Width="14" Height="14" />
+        </Button>
+      </Grid>
+      <ProgressBar Grid.Row="1" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+      <ListBox Name="LogList" Grid.Row="2" Classes="log" ItemsSource="{Binding Log}" FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace" FontSize="12">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="app:LogEntry">
+            <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}" FontWeight="{Binding Weight}" TextWrapping="Wrap" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Grid>
+
+    <Border Grid.Row="3" Classes="statusbar" Classes.working="{Binding IsBusy}" Padding="10,0">
+      <TextBlock Text="{Binding Activity}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Border>
+  </Grid>
+</Window>

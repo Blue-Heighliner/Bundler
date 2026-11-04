@@ -1,0 +1,12 @@
+global using System.Text;
+global using System.Text.Json.Nodes;
+global using Avalonia;
+global using Avalonia.Controls;
+global using Avalonia.Headless;
+global using Avalonia.Headless.XUnit;
+global using Avalonia.Interactivity;
+global using Avalonia.VisualTree;
+global using BlueHeighliner.Bundler;
+global using Microsoft.Extensions.DependencyInjection;
+global using Moq;
+global using Xunit;

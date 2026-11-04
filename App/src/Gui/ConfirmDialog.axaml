@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="BlueHeighliner.Bundler.ConfirmDialog"
+        Title="Bundler"
+        Width="460"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="20" Spacing="20">
+    <TextBlock Name="Message" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Name="Yes" Content="Yes" MinWidth="80" HorizontalContentAlignment="Center" IsDefault="True" />
+      <Button Name="No" Content="No" MinWidth="80" HorizontalContentAlignment="Center" IsCancel="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

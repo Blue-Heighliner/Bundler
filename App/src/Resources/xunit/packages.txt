@@ -1,0 +1,24 @@
+# xunit v3 only (no xunit 2.x packages), plus the test platform pieces v3 projects use, Moq and coverlet.collector.
+xunit.v3
+xunit.v3.core
+xunit.v3.assert
+xunit.v3.common
+xunit.v3.extensibility.core
+xunit.v3.runner.common
+xunit.v3.runner.console
+xunit.v3.runner.inproc.console
+xunit.v3.runner.msbuild
+xunit.v3.runner.utility
+xunit.v3.mtp-v1
+xunit.v3.mtp-v2
+xunit.v3.mtp-off
+xunit.v3.core.mtp-v1
+xunit.v3.core.mtp-v2
+xunit.v3.core.mtp-off
+
+# The VSTest adapter and test SDK that the xunit v3 project template references.
+xunit.runner.visualstudio
+Microsoft.NET.Test.Sdk
+
+Moq
+coverlet.collector

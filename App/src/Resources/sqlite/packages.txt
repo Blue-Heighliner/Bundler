@@ -1,0 +1,24 @@
+# SQLite for .NET: ADO.NET providers, Entity Framework Core, the native SQLite builds, and common wrappers.
+# A leading ? means optional (skipped with a warning when it has no stable release); a leading = means only that package.
+
+# Microsoft.Data.Sqlite and EF Core
+Microsoft.Data.Sqlite
+Microsoft.Data.Sqlite.Core
+Microsoft.EntityFrameworkCore.Sqlite
+Microsoft.EntityFrameworkCore.Sqlite.Core
+Microsoft.EntityFrameworkCore.Design
+=dotnet-ef
+
+# SQLitePCLRaw: the native SQLite builds the providers load
+SQLitePCLRaw.bundle_e_sqlite3
+SQLitePCLRaw.core
+SQLitePCLRaw.lib.e_sqlite3
+SQLitePCLRaw.provider.e_sqlite3
+?SQLitePCLRaw.bundle_sqlite3
+?SQLitePCLRaw.bundle_e_sqlite3mc
+?SQLitePCLRaw.bundle_e_sqlcipher
+
+# Other providers and wrappers
+System.Data.SQLite
+System.Data.SQLite.Core
+sqlite-net-pcl

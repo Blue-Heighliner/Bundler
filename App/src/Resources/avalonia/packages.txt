@@ -1,0 +1,38 @@
+# Avalonia (the current 12.x line), its platform backends, headless testing, and packages that are commonly used with it.
+# A leading ? means optional: skipped with a warning when there is no stable release.
+# Left out on purpose: Avalonia.Controls.TreeDataGrid and AvaloniaUI.DiagnosticsSupport (AvaloniaUI paid products or
+# packages without a stated license; the template pack is installed with its references to DiagnosticsSupport removed),
+# and Avalonia.ReactiveUI and Avalonia.Diagnostics (they only exist for Avalonia 11).
+# Avalonia.Angle.Windows.Natives comes in as a dependency of Avalonia.Win32.
+
+Avalonia
+Avalonia.Desktop
+Avalonia.Themes.Fluent
+Avalonia.Themes.Simple
+Avalonia.Fonts.Inter
+Avalonia.Controls.DataGrid
+Avalonia.Controls.ColorPicker
+Avalonia.Skia
+Avalonia.X11
+Avalonia.Win32
+Avalonia.Native
+Avalonia.FreeDesktop
+Avalonia.Markup.Xaml.Loader
+Avalonia.Remote.Protocol
+Avalonia.BuildServices
+Avalonia.Headless
+Avalonia.Headless.XUnit
+
+# Commonly used with Avalonia
+CommunityToolkit.Mvvm
+Tmds.DBus.Protocol
+?Avalonia.AvaloniaEdit
+?AvaloniaEdit.TextMate
+?Xaml.Behaviors.Avalonia
+?Projektanker.Icons.Avalonia
+?Projektanker.Icons.Avalonia.FontAwesome
+?Projektanker.Icons.Avalonia.MaterialDesign
+?Material.Icons.Avalonia
+?FluentAvaloniaUI
+?Semi.Avalonia
+?DialogHost.Avalonia

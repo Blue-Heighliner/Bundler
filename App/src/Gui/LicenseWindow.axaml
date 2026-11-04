@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="BlueHeighliner.Bundler.LicenseWindow"
+        Title="License"
+        Width="860"
+        Height="680"
+        MinWidth="480"
+        MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Background}">
+  <Window.Styles>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="TabItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Padding" Value="12,6,12,14" />
+    </Style>
+    <Style Selector="TabControl TextBox /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+    </Style>
+    <Style Selector="TabControl TextBox:pointerover /template/ Border#PART_BorderElement, TabControl TextBox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+    </Style>
+  </Window.Styles>
+  <TabControl Name="Tabs" Margin="8" />
+</Window>

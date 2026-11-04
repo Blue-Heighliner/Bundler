@@ -1,0 +1,43 @@
+# Basic .NET packages that go into the offline NuGet feed of the dev bundle (the list supplied for this bundle).
+# "Id" means the latest stable version. Platform packs are mirrored for linux-x64 and win-x64.
+
+# Microsoft.Extensions
+Microsoft.Extensions.Hosting
+Microsoft.Extensions.Hosting.Abstractions
+Microsoft.Extensions.Hosting.Systemd
+Microsoft.Extensions.DependencyInjection
+Microsoft.Extensions.DependencyInjection.Abstractions
+Microsoft.Extensions.Configuration
+Microsoft.Extensions.Configuration.Abstractions
+Microsoft.Extensions.Configuration.CommandLine
+Microsoft.Extensions.Configuration.EnvironmentVariables
+Microsoft.Extensions.Logging
+Microsoft.Extensions.Logging.Abstractions
+Microsoft.Extensions.Http
+Microsoft.Extensions.Diagnostics
+Microsoft.Extensions.ObjectPool
+Microsoft.Extensions.Primitives
+
+# System
+System.CommandLine
+System.IO.Ports
+System.Threading.Tasks.Dataflow
+System.Reactive
+System.Reactive.Linq
+System.Linq.Async
+System.Drawing.Common
+System.Text.Json
+System.Collections.Immutable
+System.Memory
+System.Buffers
+System.Threading.Tasks.Extensions
+Microsoft.NET.Test.Sdk
+
+# Runtime, apphost and tooling packs (for dotnet publish -r, self-contained and trimmed builds)
+Microsoft.NETCore.App.Runtime.linux-x64
+Microsoft.NETCore.App.Runtime.win-x64
+Microsoft.NETCore.App.Host.linux-x64
+Microsoft.NETCore.App.Host.win-x64
+Microsoft.AspNetCore.App.Runtime.linux-x64
+Microsoft.AspNetCore.App.Runtime.win-x64
+Microsoft.NET.ILLink.Tasks

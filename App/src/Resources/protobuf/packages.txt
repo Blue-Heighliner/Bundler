@@ -1,0 +1,3 @@
+# protobuf-net and the packages it needs.
+protobuf-net
+protobuf-net.Core

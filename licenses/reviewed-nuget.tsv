@@ -1,0 +1,12 @@
+# NuGet packages whose license text was read by a person. Columns: package id, license, note.
+# Only add a package after reading its license; see CLAUDE.md.
+Microsoft.Testing.Extensions.CodeCoverage	Microsoft .NET Library License	Allows install and use to develop and test applications; distribution terms do not apply to internal use
+xunit.abstractions	Apache-2.0 (.NET Foundation)	licenseUrl points to the xunit license.txt
+Avalonia.Angle.Windows.Natives	BSD-3-Clause (ANGLE Project)	LICENSE file inside the package is the BSD 3-clause text
+SourceGear.sqlite3	SQLite public domain dedication	LICENSE.txt in the package says "SQLite is Public Domain"
+SQLite	SQLite public domain dedication	LICENSE.txt in the package says "SQLite is Public Domain"
+SQLitePCLRaw.lib.e_sqlite3	SQLite public domain dedication	LICENSE.txt in the package says "SQLite is Public Domain"
+Stub.System.Data.SQLite.Core.NetStandard	SQLite public domain dedication	licenseUrl is sqlite.org/copyright.html
+System.Data.SQLite	Public Domain	nuspec copyright field says Public Domain
+System.Data.SQLite.Core	SQLite public domain dedication	licenseUrl is sqlite.org/copyright.html
+sqlite-net-pcl	MIT	LICENSE.txt in the package is the MIT text (Krueger Systems)

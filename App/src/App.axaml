@@ -1,0 +1,234 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BlueHeighliner.Bundler.App"
+             RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <FluentTheme />
+
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    </Style>
+    <Style Selector="TextBlock.header">
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="0.6" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Border.statusbar">
+      <Setter Property="Background" Value="{DynamicResource StatusIdle}" />
+    </Style>
+    <Style Selector="Border.statusbar.working">
+      <Setter Property="Background" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="Border.statusbar TextBlock">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Padding" Value="8,5" />
+      <Setter Property="MinHeight" Value="28" />
+    </Style>
+
+    <Style Selector="Button">
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Padding" Value="14,5" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}" />
+      <Setter Property="TextElement.Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Elevated}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource Disabled}" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource Accent}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentHover}" />
+      <Setter Property="TextElement.Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Elevated}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource Disabled}" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Danger}" />
+      <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+    </Style>
+    <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Danger}" />
+      <Setter Property="TextElement.Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.icon">
+      <Setter Property="Padding" Value="4" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="MinWidth" Value="24" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+    </Style>
+    <Style Selector="Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.icon:disabled Path.lineIcon">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <Style Selector="Path.lineIcon">
+      <Setter Property="Stroke" Value="{DynamicResource Muted}" />
+      <Setter Property="StrokeThickness" Value="1.2" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="Fill" Value="Transparent" />
+      <Setter Property="Stretch" Value="Uniform" />
+    </Style>
+    <Style Selector="Button.icon:pointerover Path.lineIcon">
+      <Setter Property="Stroke" Value="{DynamicResource Text}" />
+    </Style>
+
+    <Style Selector="CheckBox">
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Padding" Value="6,0,0,0" />
+    </Style>
+
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem">
+      <Setter Property="Padding" Value="12,1" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.log ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
+    </Style>
+
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0,1" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource StateAvailable}" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource AccentHover}" />
+      <Setter Property="TextBlock.TextDecorations" Value="Underline" />
+    </Style>
+    <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.badge">
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="9,1" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Background" Value="#33969696" />
+    </Style>
+    <Style Selector="Border.badge TextBlock">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    </Style>
+    <Style Selector="Border.badge[Tag=Available]"><Setter Property="Background" Value="#33569CD6" /></Style>
+    <Style Selector="Border.badge[Tag=Available] TextBlock"><Setter Property="Foreground" Value="{DynamicResource StateAvailable}" /></Style>
+    <Style Selector="Border.badge[Tag=Installed]"><Setter Property="Background" Value="#3373C991" /></Style>
+    <Style Selector="Border.badge[Tag=Installed] TextBlock"><Setter Property="Foreground" Value="{DynamicResource GitAdded}" /></Style>
+
+    <Style Selector="Border.topbar">
+      <Setter Property="Background" Value="{DynamicResource Elevated}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+    </Style>
+
+    <Style Selector="GridSplitter">
+      <Setter Property="Background" Value="{DynamicResource Border}" />
+    </Style>
+    <Style Selector="GridSplitter:pointerover">
+      <Setter Property="Background" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="ProgressBar">
+      <Setter Property="MinHeight" Value="2" />
+      <Setter Property="Height" Value="2" />
+      <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+  </Application.Styles>
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <Color x:Key="SystemAccentColor">#007ACC</Color>
+      <Color x:Key="SystemAccentColorLight1">#1F8AD2</Color>
+      <Color x:Key="SystemAccentColorLight2">#4BA3DD</Color>
+      <Color x:Key="SystemAccentColorLight3">#75BDE8</Color>
+      <Color x:Key="SystemAccentColorDark1">#0065A9</Color>
+      <Color x:Key="SystemAccentColorDark2">#005289</Color>
+      <Color x:Key="SystemAccentColorDark3">#003F6B</Color>
+      <SolidColorBrush x:Key="Background" Color="#1E1E1E" />
+      <SolidColorBrush x:Key="Surface" Color="#252526" />
+      <SolidColorBrush x:Key="Elevated" Color="#2D2D2D" />
+      <SolidColorBrush x:Key="Border" Color="#3C3C3C" />
+      <SolidColorBrush x:Key="Hover" Color="#2A2D2E" />
+      <SolidColorBrush x:Key="Selection" Color="#094771" />
+      <SolidColorBrush x:Key="Text" Color="#CCCCCC" />
+      <SolidColorBrush x:Key="Muted" Color="#969696" />
+      <SolidColorBrush x:Key="Disabled" Color="#6B6B6B" />
+      <SolidColorBrush x:Key="Accent" Color="#007ACC" />
+      <SolidColorBrush x:Key="StatusIdle" Color="#3C3C3C" />
+      <SolidColorBrush x:Key="AccentHover" Color="#1F8AD2" />
+      <SolidColorBrush x:Key="Danger" Color="#C74E39" />
+      <SolidColorBrush x:Key="StateAvailable" Color="#569CD6" />
+      <SolidColorBrush x:Key="GitAdded" Color="#73C991" />
+      <SolidColorBrush x:Key="GitModified" Color="#E2C08D" />
+      <Geometry x:Key="RefreshIconGeometry">M12,7 A5,5 0 1 1 10.5,3.5 M11,0.8 L11,4 L7.8,4</Geometry>
+      <Geometry x:Key="SelectAllIconGeometry">M1.5,3.5 L3,5 L5.5,2 M1.5,9.5 L3,11 L5.5,8 M8,4 L13,4 M8,10 L13,10</Geometry>
+      <Geometry x:Key="SelectNoneIconGeometry">M1.5,2 L5.5,2 L5.5,6 L1.5,6 Z M1.5,8 L5.5,8 L5.5,12 L1.5,12 Z M8,4 L13,4 M8,10 L13,10</Geometry>
+      <Geometry x:Key="ClearIconGeometry">M2,4 L12,4 M5,4 L5,2 L9,2 L9,4 M3.5,4 L4.5,13 L9.5,13 L10.5,4</Geometry>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BlueHeighliner.Bundler.WindowControlsView">
+  <UserControl.Styles>
+    <Style Selector="Button.windowButton">
+      <Setter Property="Width" Value="46" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.windowButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#26FFFFFF" />
+    </Style>
+    <Style Selector="Button.windowButton.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#C42B1C" />
+    </Style>
+    <Style Selector="Button.windowButton Path">
+      <Setter Property="Stroke" Value="{DynamicResource Text}" />
+      <Setter Property="Fill" Value="Transparent" />
+      <Setter Property="StrokeThickness" Value="1.2" />
+      <Setter Property="Stretch" Value="Uniform" />
+    </Style>
+    <Style Selector="Button.windowButton.close:pointerover Path">
+      <Setter Property="Stroke" Value="White" />
+    </Style>
+  </UserControl.Styles>
+  <StackPanel Orientation="Horizontal">
+    <Button Name="Minimize" Classes="windowButton" ToolTip.Tip="Minimize" Click="OnMinimizeClick">
+      <Path Data="M1,1 M13,13 M1,7 L13,7" Width="10" Height="10" />
+    </Button>
+    <Button Name="Maximize" Classes="windowButton" ToolTip.Tip="Maximize" Click="OnMaximizeRestoreClick">
+      <Path Data="M1.5,1.5 L12.5,1.5 L12.5,12.5 L1.5,12.5 Z" Width="10" Height="10" />
+    </Button>
+    <Button Name="Restore" Classes="windowButton" ToolTip.Tip="Restore" Click="OnMaximizeRestoreClick" IsVisible="False">
+      <Path Data="M4,1.5 L12.5,1.5 L12.5,10 L10,10 M1.5,4 L10,4 L10,12.5 L1.5,12.5 Z" Width="10" Height="10" />
+    </Button>
+    <Button Name="Close" Classes="windowButton close" ToolTip.Tip="Close" Click="OnCloseClick">
+      <Path Data="M1,1 L13,13 M13,1 L1,13" Width="10" Height="10" />
+    </Button>
+  </StackPanel>
+</UserControl>

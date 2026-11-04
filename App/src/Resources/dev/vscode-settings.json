@@ -1,0 +1,23 @@
+{
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "none",
+  "update.showReleaseNotes": false,
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+  "extensions.ignoreRecommendations": true,
+  "workbench.enableExperiments": false,
+  "workbench.startupEditor": "none",
+  "workbench.settings.enableNaturalLanguageSearch": false,
+  "chat.disableAIFeatures": true,
+  "security.workspace.trust.enabled": false,
+  "git.autofetch": false,
+  "git.confirmSync": false,
+  "git.path": "/usr/bin/git",
+  "git-graph.repository.fetchAndPrune": false,
+  "git-graph.repository.commits.fetchAvatars": false,
+  "dotnet.server.useOmnisharp": false,
+  "dotnetAcquisitionExtension.existingDotnetPath": [
+    { "extensionId": "ms-dotnettools.csharp", "path": "/usr/share/dotnet/dotnet" },
+    { "extensionId": "ms-dotnettools.vscode-dotnet-runtime", "path": "/usr/share/dotnet/dotnet" }
+  ]
+}
