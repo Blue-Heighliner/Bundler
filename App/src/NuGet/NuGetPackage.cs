@@ -8,7 +8,7 @@ internal sealed record NuGetPackage
     /// <summary>Gets the package id.</summary>
     public required string Id { get; init; }
 
-    /// <summary>Gets the wanted version, or <see langword="null" /> for the latest stable one.</summary>
+    /// <summary>Gets the wanted version, a version prefix with a star such as <c>10.*</c> for the latest stable release in that range, or <see langword="null" /> for the latest stable one.</summary>
     public string? Version { get; init; }
 
     /// <summary>Gets a value indicating whether the package is skipped with a warning when it has no stable release.</summary>

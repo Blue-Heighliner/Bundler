@@ -25,6 +25,15 @@ internal interface IAptInstaller
     Task InstallRecorded(string directory, IBundleState state, CancellationToken cancellation = default);
 
     /// <summary>
+    /// Removes the installed packages whose names match a pattern, for a bundle that replaces something a different set of
+    /// packages provides (an install never removes packages by itself). The removal is not recorded: an uninstall does not bring them back.
+    /// </summary>
+    /// <param name="pattern">A regular expression for the whole package name (without an architecture).</param>
+    /// <param name="cancellation">Stops the work when cancelled.</param>
+    /// <returns>The packages that were removed; empty when none matched.</returns>
+    Task<IReadOnlyList<string>> RemoveInstalled(string pattern, CancellationToken cancellation = default);
+
+    /// <summary>
     /// Removes the packages an install added, those that nothing else needs any more (including ones requested by name such
     /// as zstd). Apt never removes kernels by itself, so kernel packages on the list go too, except the running kernel. A package that something else still needs stays, and is remembered in <c>apt-leftover</c> next to the bundles' records, so whichever uninstall comes after that other thing is gone removes it too.
     /// </summary>
@@ -86,6 +95,20 @@ internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex inde
         {
             state.Add(recordFile, package);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> RemoveInstalled(string pattern, CancellationToken cancellation = default)
+    {
+        Regex expression = new($"^(?:{pattern})$");
+        ProcessResult listed = await runner.Run(new() { FileName = "dpkg-query", Arguments = ["-W", "-f", "${db:Status-Status}\t${binary:Package}\n"], Check = false }, cancellation);
+        List<string> names = [.. listed.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => line.Split('\t')).Where(fields => fields.Length == 2 && fields[0] == "installed" && expression.IsMatch(fields[1].Split(':')[0])).Select(fields => fields[1]).Order(StringComparer.Ordinal)];
+        if (names.Count > 0)
+        {
+            await runner.Run(new() { FileName = "apt-get", Arguments = ["remove", "-y", "--purge", .. names], Environment = noninteractive, StreamOutput = true }, cancellation);
+        }
+
+        return names;
     }
 
     /// <inheritdoc />
@@ -195,7 +218,15 @@ internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex inde
                 }
             }
 
-            await runner.Run(new() { FileName = "apt-get", Arguments = [.. options, .. install], Environment = noninteractive, StreamOutput = true }, cancellation);
+            try
+            {
+                await runner.Run(new() { FileName = "apt-get", Arguments = [.. options, .. install], Environment = noninteractive, StreamOutput = true }, cancellation);
+            }
+            catch (ProcessFailedException exception) when (exception.Message.Contains("remove is disabled", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("the packages of the bundle cannot be installed without removing packages that are on this computer (apt lists them above under REMOVED). An install never removes packages on its own, so nothing was changed. Remove them yourself if that is what you want, then install again.", exception);
+            }
+
             return (await InstalledNames(cancellation)).Except(before).Order(StringComparer.Ordinal).ToList();
         }
         finally

@@ -271,6 +271,11 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
             return;
         }
 
+        if (machine.SystemName is string system && !string.Equals(system, bundle.Target, StringComparison.OrdinalIgnoreCase))
+        {
+            log.Warn($"{bundle.Name} is made for {bundle.Target} but this computer runs {system}: its Ubuntu packages may not fit, and the install may fail.");
+        }
+
         long size = new FileInfo(file).Length;
         long free = new DriveInfo(paths.Unpack).AvailableFreeSpace;
         if (free < size + 500_000_000)
@@ -317,7 +322,7 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
     {
         if (!machine.IsLinux)
         {
-            throw new PlatformNotSupportedException("Bundler builds and installs bundles on Linux only (Ubuntu 26.04).");
+            throw new PlatformNotSupportedException("Bundler builds and installs bundles on Linux only (Ubuntu 24.04).");
         }
     }
 

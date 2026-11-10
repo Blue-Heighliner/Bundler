@@ -1,12 +1,14 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// The NVIDIA Linux driver for the RTX A2000 (Ampere): the series NVIDIA lists as its latest stable release, as the packages
+/// The NVIDIA Linux driver for the RTX A2000 (Ampere): the newest series Ubuntu packages (up to the series NVIDIA lists as its latest stable release), as the packages
 /// Ubuntu builds from it. The open kernel modules are prebuilt and signed by Canonical, so they load with Secure Boot on and
 /// need no compiler. They are built for one kernel, so the bundle brings that kernel too.
 /// </summary>
 internal sealed class A2000Bundle(IReleaseSources sources, IAptBuilder apt, IAptInstaller installer, IDecisions decisions, IProcessRunner runner, IVersions versions, ILog log) : BundleBase
 {
+    private static readonly string release = "24.04";
+
     private static readonly string[] a2000Ids = ["2531", "2571"];
 
     /// <inheritdoc />
@@ -23,16 +25,12 @@ internal sealed class A2000Bundle(IReleaseSources sources, IAptBuilder apt, IApt
     {
         log.Step("Looking up NVIDIA's latest stable driver");
         string latest = await sources.LatestNvidiaDriver(cancellation);
-        string series = latest.Split('.')[0];
-        log.Info($"NVIDIA's latest stable release is {latest}, so the {series} series");
+        log.Info($"NVIDIA's latest stable release is {latest}");
+        await apt.Prepare([], cancellation);
+        string series = await Series(latest.Split('.')[0], cancellation);
         string driver = $"nvidia-driver-{series}-open";
         string modules = $"linux-modules-nvidia-{series}-open-generic";
-        await apt.Prepare([], cancellation);
-        if (!await apt.Exists(driver, cancellation) || !await apt.Exists(modules, cancellation))
-        {
-            throw new InvalidOperationException($"Ubuntu 26.04 has no packaged NVIDIA {series} driver ({driver}, {modules})");
-        }
-
+        log.Info($"the newest series Ubuntu {release} packages is {series}");
         IReadOnlyList<DebPackage> packages = await apt.Download(Path.Combine(directory, "debs"), new() { Services = [driver, modules] }, cancellation);
         string version = versions.Upstream(packages.First(package => package.Package == driver).Version, '-');
         if (version != latest)
@@ -62,6 +60,7 @@ internal sealed class A2000Bundle(IReleaseSources sources, IAptBuilder apt, IApt
         string? have = await InstalledVersion(cancellation);
         if (decisions.Install("NVIDIA driver", have, version))
         {
+            await RemoveOtherSeries(version.Split('.')[0], cancellation);
             await installer.InstallRecorded(Path.Combine(context.Payload, "debs"), context.State, cancellation);
             context.State.MarkOwned("driver");
         }
@@ -69,7 +68,7 @@ internal sealed class A2000Bundle(IReleaseSources sources, IAptBuilder apt, IApt
         string loaded = File.Exists("/sys/module/nvidia/version") ? File.ReadAllText("/sys/module/nvidia/version").Trim() : string.Empty;
         if (loaded != version)
         {
-            log.Warn("restart the computer to load the driver. It boots into the newest installed kernel, which has matching modules.");
+            log.Warn($"restart the computer to load the driver. The prebuilt modules are for kernel {ModulesKernel(context)}: if the computer starts a different kernel (a newer one, such as an HWE kernel), pick that one in the boot menu.");
         }
 
         ProcessResult cards = await runner.Try("nvidia-smi", ["-L"]);
@@ -91,6 +90,40 @@ internal sealed class A2000Bundle(IReleaseSources sources, IAptBuilder apt, IApt
         if (context.State.IsOwned("driver"))
         {
             log.Warn("restart the computer to unload the driver (the display falls back to the open nouveau driver).");
+        }
+    }
+
+    private string ModulesKernel(InstallContext context)
+    {
+        string? package = context.Info.Components.FirstOrDefault(component => component.StartsWith("linux-modules-nvidia-", StringComparison.Ordinal));
+        string version = package?.Split(' ').ElementAtOrDefault(1) ?? string.Empty;
+        return version.Contains('.') ? version[..version.LastIndexOf('.')] + "-generic" : "of the bundle";
+    }
+
+    private async Task<string> Series(string latest, CancellationToken cancellation)
+    {
+        IReadOnlyList<string> offered = await apt.FindAll(@"nvidia-driver-[0-9]+-open", cancellation);
+        foreach (string series in offered.Select(name => name["nvidia-driver-".Length..^"-open".Length]).Where(series => int.Parse(series) <= int.Parse(latest)).OrderByDescending(int.Parse))
+        {
+            if (await apt.Exists($"linux-modules-nvidia-{series}-open-generic", cancellation))
+            {
+                return series;
+            }
+        }
+
+        throw new InvalidOperationException($"Ubuntu {release} has no packaged NVIDIA open driver up to the {latest} series");
+    }
+
+    private async Task RemoveOtherSeries(string series, CancellationToken cancellation)
+    {
+        ProcessResult result = await runner.Run(new() { FileName = "dpkg-query", Arguments = ["-W", "-f", "${db:Status-Status} ${Package}\n", "nvidia-driver-*", "nvidia-kernel-common-*", "nvidia-utils-*", "libnvidia-gl-*"], Check = false }, cancellation);
+        IEnumerable<string> others = result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => line.Split(' ')).Where(fields => fields.Length == 2 && fields[0] == "installed")
+            .Select(fields => Regex.Match(fields[1], @"^(?:nvidia-driver|nvidia-kernel-common|nvidia-utils|libnvidia-gl)-([0-9]+)").Groups[1].Value).Where(other => other.Length > 0 && other != series).Distinct();
+        foreach (string other in others)
+        {
+            log.Info($"the NVIDIA {other} driver is installed and the bundle brings the {series} series, which cannot be installed next to it: removing the {other} packages first");
+            IReadOnlyList<string> removed = await installer.RemoveInstalled($@"(?:lib)?nvidia-[a-z0-9-]*-{other}(?:-.*)?|xserver-xorg-video-nvidia-{other}|linux-modules-nvidia-{other}-.*", cancellation);
+            log.Info($"removed {string.Join(' ', removed)}");
         }
     }
 

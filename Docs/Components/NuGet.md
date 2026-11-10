@@ -4,7 +4,7 @@ Covers `NuGetMirror`, `NuGetBundleBuilder`, `NuGetBundleInstaller`, `NuGetFeed`,
 
 ## Mirror
 
-`DotNetSdks` downloads the latest stable .NET SDK into the cache and runs it privately. `NuGetMirror` restores a scratch project that references the requested packages (latest stable unless `Id@version`; `?Id` optional; `=Id` without dependencies) for `net10.0`, plus the runtime packs for linux-x64 and win-x64, then copies every package in the resulting global packages folder into the feed layout `id/version/id.version.nupkg` with `.sha512` and `.nuspec`: NuGet only treats a folder as a hierarchical feed when those hash files exist. The scratch folder is outside any git repository so a repository's `global.json` or `Directory.Build.props` cannot change the restore.
+`DotNetSdks` downloads the latest SDK of the .NET 10.0 channel into the cache and runs it privately. `NuGetMirror` restores a scratch project that references the requested packages (latest stable unless `Id@version` for one exact version or `Id@10.*` for the newest stable 10.x one, which packages that follow the .NET release use because a net10.0 feed cannot take their 11.x versions; `?Id` optional; `=Id` without dependencies) for `net10.0`, plus the runtime packs for linux-x64 and win-x64, then copies every package in the resulting global packages folder into the feed layout `id/version/id.version.nupkg` with `.sha512` and `.nuspec`: NuGet only treats a folder as a hierarchical feed when those hash files exist. The scratch folder is outside any git repository so a repository's `global.json` or `Directory.Build.props` cannot change the restore.
 
 ## Feed on the offline computer
 

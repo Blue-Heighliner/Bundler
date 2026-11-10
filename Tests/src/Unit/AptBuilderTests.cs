@@ -29,7 +29,7 @@ public sealed class AptBuilderTests : IDisposable
         {
             return new ProcessResult(
                 0,
-                "Inst gimp (3.2-1ubuntu0.1 Ubuntu:26.04/resolute-updates [amd64])\nInst libfoo (2.0-1ubuntu0.1 Ubuntu:26.04/resolute-updates [amd64])\nInst libbar (1.0-1 Ubuntu:26.04/resolute [amd64])\nInst zlib1g (1:1.3-1ubuntu0.1 Ubuntu:26.04/resolute-updates [amd64])\n",
+                "Inst gimp (3.2-1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])\nInst libfoo (2.0-1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])\nInst libbar (1.0-1 Ubuntu:24.04/noble [amd64])\nInst zlib1g (1:1.3-1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])\n",
                 string.Empty);
         }
 
@@ -49,13 +49,13 @@ public sealed class AptBuilderTests : IDisposable
                 0,
                 string.Join(
                     '\n',
-                    " gimp | 3.2-1ubuntu0.1 | http://archive.ubuntu.com/ubuntu resolute-updates/main amd64 Packages",
-                    " gimp | 3.2-1 | http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages",
-                    " libfoo | 2.0-1ubuntu0.1 | http://archive.ubuntu.com/ubuntu resolute-updates/main amd64 Packages",
-                    " libfoo | 2.0-1 | http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages",
-                    " libbar | 1.0-1 | http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages",
-                    " zlib1g | 1:1.3-1ubuntu0.1 | http://archive.ubuntu.com/ubuntu resolute-updates/main amd64 Packages",
-                    " zlib1g | 1:1.3-1 | http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages") + "\n",
+                    " gimp | 3.2-1ubuntu0.1 | http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages",
+                    " gimp | 3.2-1 | http://archive.ubuntu.com/ubuntu noble/main amd64 Packages",
+                    " libfoo | 2.0-1ubuntu0.1 | http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages",
+                    " libfoo | 2.0-1 | http://archive.ubuntu.com/ubuntu noble/main amd64 Packages",
+                    " libbar | 1.0-1 | http://archive.ubuntu.com/ubuntu noble/main amd64 Packages",
+                    " zlib1g | 1:1.3-1ubuntu0.1 | http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages",
+                    " zlib1g | 1:1.3-1 | http://archive.ubuntu.com/ubuntu noble/main amd64 Packages") + "\n",
                 string.Empty);
         }
 
@@ -95,5 +95,15 @@ public sealed class AptBuilderTests : IDisposable
 
         Assert.DoesNotContain(packages, package => package.Package == "libfoo" && package.Version == "2.0-1");
         Assert.Contains(packages, package => package.Package == "libfoo" && package.Version == "2.0-1ubuntu0.1");
+    }
+
+    [Fact]
+    public async Task FindAll_ReturnsTheMatchingNamesInVersionOrder()
+    {
+        runner.Setup(r => r.Run(It.Is<ProcessCommand>(command => command.FileName == "apt-cache" && command.Arguments.Contains("pkgnames")), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, "nvidia-driver-580-open\nnvidia-driver-570-open\nnvidia-driver-595\nnvidia-driver-1000-open\nother\n", string.Empty));
+
+        Assert.Equal(["nvidia-driver-570-open", "nvidia-driver-580-open", "nvidia-driver-1000-open"], await builder.FindAll(@"nvidia-driver-[0-9]+-open"));
+        Assert.Equal("nvidia-driver-1000-open", await builder.Find(@"nvidia-driver-[0-9]+-open"));
     }
 }

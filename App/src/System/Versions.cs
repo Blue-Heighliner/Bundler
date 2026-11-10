@@ -24,7 +24,7 @@ internal interface IVersions
     /// <summary>
     /// Cuts the packaging off a Debian version: the epoch in front, and everything from the first of the given characters on.
     /// </summary>
-    /// <param name="debianVersion">The package version, such as <c>1:2.56.0-0ppa1~ubuntu26.04.2</c>.</param>
+    /// <param name="debianVersion">The package version, such as <c>1:2.56.0-0ppa1~ubuntu24.04.2</c>.</param>
     /// <param name="stops">The characters the upstream version ends at.</param>
     /// <returns>The upstream version, such as <c>2.56.0</c>.</returns>
     string Upstream(string debianVersion, params char[] stops);

@@ -52,7 +52,7 @@ public sealed class VsCodeBundleTests : IDisposable
     {
         Assert.Equal("vs-code", bundle.Name);
         Assert.Equal(["git", "dotnet", "ollama"], bundle.Requires);
-        Assert.Equal("Ubuntu 26.04", bundle.Target);
+        Assert.Equal("Ubuntu 24.04", bundle.Target);
     }
 
     [Fact]

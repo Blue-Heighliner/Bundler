@@ -7,7 +7,8 @@ namespace BlueHeighliner.Bundler;
 internal interface IDotNetSdks
 {
     /// <summary>
-    /// Finds the latest stable SDK release, looking it up once.
+    /// Finds the latest stable SDK release of the .NET 10.0 channel (the long term support release the NuGet feed and the project
+    /// templates are built for), looking it up once.
     /// </summary>
     /// <param name="cancellation">Stops the lookup when cancelled.</param>
     /// <returns>The release.</returns>
@@ -45,11 +46,13 @@ internal sealed class DotNetSdks(IPaths paths, IReleaseSources sources, IHttpFet
 {
     private static readonly string installedRoot = "/usr/share/dotnet";
 
+    private readonly string channel = "10.0";
+
     private DotNetRelease? latest;
 
     /// <inheritdoc />
     public async Task<DotNetRelease> Latest(CancellationToken cancellation = default)
-        => latest ??= await sources.LatestDotNet(cancellation);
+        => latest ??= await sources.LatestDotNet(channel, cancellation);
 
     /// <inheritdoc />
     public async Task<string> Tarball(CancellationToken cancellation = default)

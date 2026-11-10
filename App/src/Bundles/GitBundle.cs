@@ -1,7 +1,7 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// The latest stable git, from the official git-core PPA built for Ubuntu 26.04.
+/// The latest stable git, from the official git-core PPA built for Ubuntu 24.04.
 /// </summary>
 internal sealed class GitBundle(IAptBuilder apt, IAptInstaller installer, IProcessRunner runner, ILog log) : BundleBase
 {

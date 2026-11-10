@@ -2,8 +2,8 @@ namespace BlueHeighliner.Bundler;
 
 /// <summary>
 /// Collects Ubuntu packages for a bundle. A private apt root in the build cache (no root rights needed) is pointed at the
-/// Ubuntu 26.04 archive whatever Ubuntu the build computer runs; it works out which <c>.deb</c> files the packages need on a fresh
-/// 26.04 system and downloads them into a small local repository that the install uses without any network.
+/// Ubuntu 24.04 archive whatever Ubuntu the build computer runs; it works out which <c>.deb</c> files the packages need on a fresh
+/// 24.04 system and downloads them into a small local repository that the install uses without any network.
 /// </summary>
 internal interface IAptBuilder
 {
@@ -52,8 +52,16 @@ internal interface IAptBuilder
     Task<string?> Find(string pattern, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Downloads the packages and everything they need that a fresh Ubuntu 26.04 does not have, and writes the repository
-    /// index. Essential and required packages are left out, but only at the version 26.04 was released with: once such a
+    /// Finds every package whose whole name matches a regular expression.
+    /// </summary>
+    /// <param name="pattern">The regular expression.</param>
+    /// <param name="cancellation">Stops the search when cancelled.</param>
+    /// <returns>The names, in version order (lowest first); empty when there are none.</returns>
+    Task<IReadOnlyList<string>> FindAll(string pattern, CancellationToken cancellation = default);
+
+    /// <summary>
+    /// Downloads the packages and everything they need that a fresh Ubuntu 24.04 does not have, and writes the repository
+    /// index. Essential and required packages are left out, but only at the version 24.04 was released with: once such a
     /// package has been updated, a computer without the update could not satisfy an exact version requirement (perl needs
     /// perl-base at its own version), so the updated one is included. The names of the services and support packages are
     /// written to <c>top-level.txt</c> and <c>support.txt</c>.
@@ -70,11 +78,11 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
 {
     private static readonly string keyring = "/usr/share/keyrings/ubuntu-archive-keyring.gpg";
 
-    private string Root => Path.Combine(paths.Cache, "apt");
+    private string Root => Path.Combine(paths.Cache, "apt-" + Release);
 
-    private string Release => "resolute";
+    private string Release => "noble";
 
-    private string Mirror => "http://archive.ubuntu.com/ubuntu";
+    private string Mirror => "http://us.archive.ubuntu.com/ubuntu";
 
     /// <inheritdoc />
     public async Task Prepare(IReadOnlyList<string> extraSources, CancellationToken cancellation = default)
@@ -122,11 +130,14 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
 
     /// <inheritdoc />
     public async Task<string?> Find(string pattern, CancellationToken cancellation = default)
+        => (await FindAll(pattern, cancellation)).LastOrDefault();
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> FindAll(string pattern, CancellationToken cancellation = default)
     {
         ProcessResult names = await runner.Run(new() { FileName = "apt-cache", Arguments = [.. Options, "pkgnames"] }, cancellation);
         Regex expression = new($"^(?:{pattern})$");
-        return names.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(name => expression.IsMatch(name))
-            .OrderBy(name => name, Comparer<string>.Create(versions.Compare)).LastOrDefault();
+        return [.. names.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(name => expression.IsMatch(name)).OrderBy(name => name, Comparer<string>.Create(versions.Compare))];
     }
 
     /// <inheritdoc />

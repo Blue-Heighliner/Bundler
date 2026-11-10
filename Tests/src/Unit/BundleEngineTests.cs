@@ -22,12 +22,12 @@ public sealed class BundleEngineTests : IDisposable
         Directory.CreateDirectory(directory.Combine("bundles"));
         git.SetupGet(b => b.Name).Returns("git");
         git.SetupGet(b => b.Description).Returns("Git");
-        git.SetupGet(b => b.Target).Returns("Ubuntu 26.04");
+        git.SetupGet(b => b.Target).Returns("Ubuntu 24.04");
         git.SetupGet(b => b.Requires).Returns([]);
         git.SetupGet(b => b.Resumable).Returns([]);
         dev.SetupGet(b => b.Name).Returns("dev");
         dev.SetupGet(b => b.Description).Returns("Dev");
-        dev.SetupGet(b => b.Target).Returns("Ubuntu 26.04");
+        dev.SetupGet(b => b.Target).Returns("Ubuntu 24.04");
         dev.SetupGet(b => b.Requires).Returns(["git"]);
         dev.SetupGet(b => b.Resumable).Returns([]);
         catalog.SetupGet(c => c.All).Returns([git.Object, dev.Object]);
@@ -74,7 +74,7 @@ public sealed class BundleEngineTests : IDisposable
 
         IReadOnlyList<BundleStatus> list = engine.List();
 
-        Assert.Equal("Ubuntu 26.04", list[0].Target);
+        Assert.Equal("Ubuntu 24.04", list[0].Target);
         Assert.Equal(BundleStanding.Installed, list[0].State);
         Assert.Equal(new DateTime(2026, 10, 30, 9, 19, 0), list[0].FileModified);
         Assert.Equal(BundleStanding.NotBuilt, list[1].State);
@@ -225,6 +225,24 @@ public sealed class BundleEngineTests : IDisposable
 
         git.Verify(b => b.Install(It.Is<InstallContext>(context => context.Users.SequenceEqual(new[] { "alice" })), It.IsAny<CancellationToken>()), Times.Once);
         gitState.Verify(s => s.Begin(It.Is<IEnumerable<string>>(accounts => accounts.SequenceEqual(new[] { "alice" }))), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("Ubuntu 26.04", true)]
+    [InlineData("Ubuntu 24.04", false)]
+    [InlineData(null, false)]
+    public async Task Install_SystemOtherThanTheTarget_WarnsButStillInstalls(string? system, bool warns)
+    {
+        HaveBuilt("git");
+        gitState.SetupGet(s => s.IsInstalled).Returns(false);
+        machine.SetupGet(m => m.SystemName).Returns(system);
+        archive.Setup(a => a.Extract(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        archive.Setup(a => a.Verify(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        await engine.Install(["git"], new());
+
+        log.Verify(l => l.Write(LogLevel.Warning, It.Is<string>(text => text.Contains("made for Ubuntu 24.04") && text.Contains("runs Ubuntu 26.04"))), warns ? Times.Once : Times.Never);
+        git.Verify(b => b.Install(It.IsAny<InstallContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -18,7 +18,7 @@ A bundle is the file `<name>.bundle`, built from the latest stable versions of i
 
 ## Ubuntu packages resolved in a private apt root
 
-Packages are resolved against the Ubuntu 26.04 archive in a private apt root in the cache, so a build works from any Linux host and not only from 26.04. The build computes the closure of what a fresh 26.04 needs (leaving out Essential and required packages unless the archive has a newer version than the release), downloads the `.deb` files and indexes them as a flat local repository. Installing points apt at that folder only, so it works with no network and with apt's own dependency solver.
+Packages are resolved against the Ubuntu 24.04 archive in a private apt root in the cache, so a build works from any Linux host and not only from 24.04. The build computes the closure of what a fresh 24.04 needs (leaving out Essential and required packages unless the archive has a newer version than the release), downloads the `.deb` files and indexes them as a flat local repository. Installing points apt at that folder only, so it works with no network and with apt's own dependency solver.
 
 ## NuGet mirrored with a real restore
 

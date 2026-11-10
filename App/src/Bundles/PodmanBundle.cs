@@ -1,9 +1,9 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// The Podman container engine with what rootless containers need. The version is the one in the Ubuntu 26.04 archive:
+/// The Podman container engine with what rootless containers need. The version is the one in the Ubuntu 24.04 archive:
 /// upstream is at 6.x, but for Linux it only publishes the remote client, which needs a Podman service somewhere else, so
-/// the newest complete engine packaged for 26.04 is used.
+/// the newest complete engine packaged for 24.04 is used.
 /// </summary>
 internal sealed class PodmanBundle(IAptBuilder apt, IAptInstaller installer, IProcessRunner runner, ILog log) : BundleBase
 {

@@ -46,4 +46,12 @@ public sealed class PathsTests
         Assert.EndsWith("/.config/BlueHeighliner.Bundler", new Machine().DataDirectory);
         Assert.DoesNotContain(Environment.UserName == "root" ? "never" : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), new Machine().DataDirectory);
     }
+
+    [Theory]
+    [InlineData("NAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nID=ubuntu\n", "Ubuntu 24.04")]
+    [InlineData("PRETTY_NAME=\"Debian\"\nNAME=Debian\nVERSION_ID=12\n", "Debian 12")]
+    [InlineData("NAME=\"Arch Linux\"\n", null)]
+    [InlineData("", null)]
+    public void Machine_SystemNameOf_ReadsTheNameAndVersionOfAnOsReleaseFile(string text, string? expected)
+        => Assert.Equal(expected, new Machine().SystemNameOf(text));
 }

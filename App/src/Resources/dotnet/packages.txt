@@ -1,43 +1,43 @@
 # Basic .NET packages that go into the offline NuGet feed of the dev bundle (the list supplied for this bundle).
-# "Id" means the latest stable version. Platform packs are mirrored for linux-x64 and win-x64.
+# "Id" means the latest stable version; "Id@10.*" the latest stable 10.x version (packages that follow the .NET release, which has to stay on the 10.0 the SDK of this bundle is). Platform packs are mirrored for linux-x64 and win-x64.
 
 # Microsoft.Extensions
-Microsoft.Extensions.Hosting
-Microsoft.Extensions.Hosting.Abstractions
-Microsoft.Extensions.Hosting.Systemd
-Microsoft.Extensions.DependencyInjection
-Microsoft.Extensions.DependencyInjection.Abstractions
-Microsoft.Extensions.Configuration
-Microsoft.Extensions.Configuration.Abstractions
-Microsoft.Extensions.Configuration.CommandLine
-Microsoft.Extensions.Configuration.EnvironmentVariables
-Microsoft.Extensions.Logging
-Microsoft.Extensions.Logging.Abstractions
-Microsoft.Extensions.Http
-Microsoft.Extensions.Diagnostics
-Microsoft.Extensions.ObjectPool
-Microsoft.Extensions.Primitives
+Microsoft.Extensions.Hosting@10.*
+Microsoft.Extensions.Hosting.Abstractions@10.*
+Microsoft.Extensions.Hosting.Systemd@10.*
+Microsoft.Extensions.DependencyInjection@10.*
+Microsoft.Extensions.DependencyInjection.Abstractions@10.*
+Microsoft.Extensions.Configuration@10.*
+Microsoft.Extensions.Configuration.Abstractions@10.*
+Microsoft.Extensions.Configuration.CommandLine@10.*
+Microsoft.Extensions.Configuration.EnvironmentVariables@10.*
+Microsoft.Extensions.Logging@10.*
+Microsoft.Extensions.Logging.Abstractions@10.*
+Microsoft.Extensions.Http@10.*
+Microsoft.Extensions.Diagnostics@10.*
+Microsoft.Extensions.ObjectPool@10.*
+Microsoft.Extensions.Primitives@10.*
 
 # System
 System.CommandLine
-System.IO.Ports
-System.Threading.Tasks.Dataflow
+System.IO.Ports@10.*
+System.Threading.Tasks.Dataflow@10.*
 System.Reactive
 System.Reactive.Linq
 System.Linq.Async
-System.Drawing.Common
-System.Text.Json
-System.Collections.Immutable
+System.Drawing.Common@10.*
+System.Text.Json@10.*
+System.Collections.Immutable@10.*
 System.Memory
 System.Buffers
 System.Threading.Tasks.Extensions
 Microsoft.NET.Test.Sdk
 
 # Runtime, apphost and tooling packs (for dotnet publish -r, self-contained and trimmed builds)
-Microsoft.NETCore.App.Runtime.linux-x64
-Microsoft.NETCore.App.Runtime.win-x64
-Microsoft.NETCore.App.Host.linux-x64
-Microsoft.NETCore.App.Host.win-x64
-Microsoft.AspNetCore.App.Runtime.linux-x64
-Microsoft.AspNetCore.App.Runtime.win-x64
-Microsoft.NET.ILLink.Tasks
+Microsoft.NETCore.App.Runtime.linux-x64@10.*
+Microsoft.NETCore.App.Runtime.win-x64@10.*
+Microsoft.NETCore.App.Host.linux-x64@10.*
+Microsoft.NETCore.App.Host.win-x64@10.*
+Microsoft.AspNetCore.App.Runtime.linux-x64@10.*
+Microsoft.AspNetCore.App.Runtime.win-x64@10.*
+Microsoft.NET.ILLink.Tasks@10.*

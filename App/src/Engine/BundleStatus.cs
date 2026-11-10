@@ -11,7 +11,7 @@ internal sealed record BundleStatus
     /// <summary>Gets the one line description.</summary>
     public required string Description { get; init; }
 
-    /// <summary>Gets the system the bundle is made for, such as <c>Ubuntu 26.04</c>.</summary>
+    /// <summary>Gets the system the bundle is made for, such as <c>Ubuntu 24.04</c>.</summary>
     public required string Target { get; init; }
 
     /// <summary>Gets the bundles it needs.</summary>

@@ -7,7 +7,7 @@ public sealed class MainWindowTests
 
     private MainWindow Show()
     {
-        BundleRowViewModel row = new BundleRowViewModel(new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 26.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) }, [new ServiceRow("git", "2.56.0", "Source control", ["GPL-2.0", "MIT"], "Clear.")], false);
+        BundleRowViewModel row = new BundleRowViewModel(new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) }, [new ServiceRow("git", "2.56.0", "Source control", ["GPL-2.0", "MIT"], "Clear.")], false);
         model.SetupGet(m => m.Bundles).Returns([row]);
         model.SetupGet(m => m.Current).Returns(row);
         model.SetupGet(m => m.HasCurrent).Returns(true);
@@ -32,7 +32,7 @@ public sealed class MainWindowTests
         Assert.Contains("git", texts);
         Assert.Contains("available", texts);
         Assert.Contains("Target", texts);
-        Assert.Contains("Ubuntu 26.04", texts);
+        Assert.Contains("Ubuntu 24.04", texts);
         model.Verify(m => m.Start(), Times.Once);
     }
 

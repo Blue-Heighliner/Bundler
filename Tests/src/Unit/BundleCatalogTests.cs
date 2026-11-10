@@ -34,7 +34,7 @@ public sealed class BundleCatalogTests
             catalog.All.Select(bundle => bundle.Name));
         Assert.All(catalog.All, bundle => Assert.All(bundle.Requires, required => Assert.Contains(catalog.All, other => other.Name == required)));
         Assert.All(catalog.All, bundle => Assert.NotEmpty(bundle.Description));
-        Assert.All(catalog.All, bundle => Assert.Equal("Ubuntu 26.04", bundle.Target));
+        Assert.All(catalog.All, bundle => Assert.Equal("Ubuntu 24.04", bundle.Target));
     }
 
     [Theory]

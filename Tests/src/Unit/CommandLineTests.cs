@@ -8,7 +8,7 @@ public sealed class CommandLineTests
 
     public CommandLineTests()
     {
-        engine.Setup(e => e.List()).Returns([new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 26.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) }]);
+        engine.Setup(e => e.List()).Returns([new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) }]);
         commandLine = new(engine.Object, log.Object);
     }
 
@@ -31,7 +31,7 @@ public sealed class CommandLineTests
         Assert.Contains("2026-10-30 09:19", output.ToString());
         Assert.Contains("BUNDLE FILE", output.ToString());
         Assert.Contains("TARGET", output.ToString());
-        Assert.Contains("Ubuntu 26.04", output.ToString());
+        Assert.Contains("Ubuntu 24.04", output.ToString());
     }
 
     [Fact]

@@ -25,10 +25,10 @@ public sealed class BundleFilesTests
     public void Find_WorksForNamesThatStartWithADigit()
     {
         using TempDirectory directory = new();
-        directory.Write("bundles/2d.bundle", "x");
+        directory.Write("bundles/gimp.bundle", "x");
 
-        Assert.NotNull(Create(directory).Find("2d"));
-        Assert.Null(Create(directory).Find("3d"));
+        Assert.NotNull(Create(directory).Find("gimp"));
+        Assert.Null(Create(directory).Find("blender"));
     }
 
     [Fact]

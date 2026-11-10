@@ -24,4 +24,15 @@ public sealed class NuGetPackageListTests
     [InlineData("Some.Package.x64", false)]
     public void IsPlatformPack_RecognizesRuntimePacks(string id, bool expected)
         => Assert.Equal(expected, list.IsPlatformPack(id));
+
+    [Fact]
+    public void Parse_VersionRange_IsKeptAsWritten()
+    {
+        IReadOnlyList<NuGetPackage> packages = new NuGetPackageList().Parse("Microsoft.Extensions.Hosting@10.*\n=Some.Tool@10.*\n");
+
+        Assert.Equal("10.*", packages[0].Version);
+        Assert.Equal("Some.Tool", packages[1].Id);
+        Assert.Equal("10.*", packages[1].Version);
+        Assert.True(packages[1].Alone);
+    }
 }

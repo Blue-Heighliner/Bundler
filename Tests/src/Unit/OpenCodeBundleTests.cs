@@ -51,7 +51,7 @@ public sealed class OpenCodeBundleTests : IDisposable
     public void Describes_ItselfWithTheLinuxTargetAndTheNeedForGit()
     {
         Assert.Equal("open-code", bundle.Name);
-        Assert.Equal("Ubuntu 26.04", bundle.Target);
+        Assert.Equal("Ubuntu 24.04", bundle.Target);
         Assert.Equal(["git"], bundle.Requires);
         Assert.Equal(35, bundle.Order);
     }

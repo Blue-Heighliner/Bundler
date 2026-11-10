@@ -23,7 +23,7 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
     /// <inheritdoc />
     public string Help
         => """
-            Bundler builds bundles on an online computer and installs them on an offline Ubuntu 26.04 computer.
+            Bundler builds bundles on an online computer and installs them on an offline Ubuntu 24.04 computer.
 
               Bundler                       open the window
               Bundler list                  list the bundles

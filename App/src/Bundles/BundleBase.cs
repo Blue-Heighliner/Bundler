@@ -11,7 +11,7 @@ internal interface IBundle
     /// <summary>Gets a one line description for the list.</summary>
     string Description { get; }
 
-    /// <summary>Gets the system the bundle is made for and has to be installed on, such as <c>Ubuntu 26.04</c>.</summary>
+    /// <summary>Gets the system the bundle is made for and has to be installed on, such as <c>Ubuntu 24.04</c>.</summary>
     string Target { get; }
 
     /// <summary>Gets the position in the list.</summary>
@@ -69,7 +69,7 @@ internal abstract class BundleBase : IBundle
     public abstract string Description { get; }
 
     /// <inheritdoc />
-    public virtual string Target => "Ubuntu 26.04";
+    public virtual string Target => "Ubuntu 24.04";
 
     /// <inheritdoc />
     public abstract int Order { get; }

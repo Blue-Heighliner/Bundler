@@ -1,7 +1,7 @@
 #:package Markwardt.ScriptUtilities@0.2.0
 #:property TreatWarningsAsErrors=true
 
-// Test harness: runs the published app inside a throwaway Ubuntu 26.04 chroot, so installs can be tried without touching this
+// Test harness: runs the published app inside a throwaway Ubuntu 24.04 chroot, so installs can be tried without touching this
 // computer. Needs sudo and mmdebstrap. Everything it does as root stays inside the chroot folder under /var/tmp or /tmp.
 //
 //   dotnet run Scripts/Chroot.cs create                 build the chroot (once, about a minute)
@@ -12,10 +12,12 @@
 //   dotnet run Scripts/Chroot.cs destroy                delete the chroot
 //
 // BUNDLER_TEST_PUBLISH is the folder `dotnet publish App/App.csproj -r linux-x64 -o <folder>` wrote (default /tmp/bundler-publish).
+// BUNDLER_TEST_RELEASE is the Ubuntu release `create` builds the chroot from (default noble, 24.04).
 // BUNDLER_TEST_NONET=1 runs commands without any network, like the real target.
 
 using Markwardt.ScriptUtilities;
 
+string release = Environment.GetEnvironmentVariable("BUNDLER_TEST_RELEASE") ?? "noble";
 string root = Environment.GetEnvironmentVariable("BUNDLER_TEST_ROOT") ?? "/var/tmp/bundler-test/rootfs";
 if (!root.StartsWith("/var/tmp/") && !root.StartsWith("/tmp/"))
 {
@@ -30,7 +32,7 @@ switch (command)
 {
     case "create":
         (await Script.Run(true, "sudo", "mkdir", "-p", Path.GetDirectoryName(root)!)).Verify();
-        (await Script.Run(true, "sudo", "mmdebstrap", "--variant=important", "--include=apt,passwd,util-linux,debconf,sudo,xauth,ca-certificates,polkitd", "resolute", root, "http://archive.ubuntu.com/ubuntu")).Verify();
+        (await Script.Run(true, "sudo", "mmdebstrap", "--variant=important", "--include=apt,passwd,util-linux,debconf,sudo,xauth,ca-certificates,polkitd", release, root, "http://archive.ubuntu.com/ubuntu")).Verify();
         (await Enter("useradd -m -s /bin/bash tester; id tester", "root")).Verify();
         return 0;
     case "sync":

@@ -22,7 +22,7 @@ public sealed class VersionsTests
         => Assert.Equal(sign, Math.Sign(versions.CompareDebian(left, right)));
 
     [Theory]
-    [InlineData("1:2.56.0-0ppa1~ubuntu26.04.2", "2.56.0")]
+    [InlineData("1:2.56.0-0ppa1~ubuntu24.04.2", "2.56.0")]
     [InlineData("5.7.0+ds1-2", "5.7.0")]
     [InlineData("3.0", "3.0")]
     public void Upstream_CutsEpochAndPackaging(string version, string expected)

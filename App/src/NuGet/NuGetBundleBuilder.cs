@@ -47,7 +47,7 @@ internal sealed class NuGetBundleBuilder(
         List<NuGetPackage> wanted = [];
         foreach (NuGetPackage package in list.Parse(resources.Text(spec.PackageList)))
         {
-            string? version = await sources.LatestNuGet(package.Id, cancellation);
+            string? version = await sources.LatestNuGet(package.Id, package.Version is string range && range.Contains('*') ? range : null, cancellation);
             if (version is null)
             {
                 if (package.Optional)
@@ -71,7 +71,7 @@ internal sealed class NuGetBundleBuilder(
             await mirror.Restore(restore, cancellation);
             foreach (NuGetPackage package in wanted)
             {
-                await mirror.FetchExact(package.Id, package.Version ?? latest[package.Id], cancellation);
+                await mirror.FetchExact(package.Id, package.Version is string exact && !exact.Contains('*') ? exact : latest[package.Id], cancellation);
             }
 
             await BuildTemplates(spec, directory, cancellation);
@@ -124,7 +124,7 @@ internal sealed class NuGetBundleBuilder(
         Directory.CreateDirectory(folder);
         foreach (string id in spec.TemplatePackages)
         {
-            string version = await sources.LatestNuGet(id, cancellation) ?? throw new InvalidOperationException($"template pack {id} has no stable release");
+            string version = await sources.LatestNuGet(id, null, cancellation) ?? throw new InvalidOperationException($"template pack {id} has no stable release");
             string file = Path.Combine(folder, $"{id}.{version}.nupkg");
             string lower = id.ToLowerInvariant();
             await http.Download($"https://api.nuget.org/v3-flatcontainer/{lower}/{version.ToLowerInvariant()}/{lower}.{version.ToLowerInvariant()}.nupkg", file, null, cancellation);

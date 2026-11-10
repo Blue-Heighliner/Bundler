@@ -1,7 +1,7 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// SQLite NuGet packages in the offline feed and DB Browser for SQLite (the Ubuntu 26.04 package, which is the latest stable
+/// SQLite NuGet packages in the offline feed and DB Browser for SQLite (the Ubuntu 24.04 package, which is the latest stable
 /// upstream release).
 /// </summary>
 internal sealed class SqliteBundle(INuGetBundleBuilder builder, INuGetBundleInstaller installer, IAptBuilder apt, IAptInstaller aptInstaller, ILog log) : NuGetBundleBase(builder, installer)

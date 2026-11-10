@@ -16,8 +16,8 @@ public sealed class MainViewModelTests
         services.Setup(x => x.For("dev")).Returns([]);
         engine.Setup(e => e.List()).Returns(
         [
-            new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 26.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) },
-            new BundleStatus { Name = "dev", Description = "Dev", Target = "Ubuntu 26.04", Requires = ["git"], State = BundleStanding.NotBuilt },
+            new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) },
+            new BundleStatus { Name = "dev", Description = "Dev", Target = "Ubuntu 24.04", Requires = ["git"], State = BundleStanding.NotBuilt },
         ]);
         engine.Setup(e => e.InstallPlan(It.IsAny<IReadOnlyList<string>>())).Returns((IReadOnlyList<string> names) => names);
         dialogs.Setup(d => d.Confirm(It.IsAny<string>())).ReturnsAsync(true);
@@ -40,7 +40,7 @@ public sealed class MainViewModelTests
         Assert.Equal("2026-10-30 09:19", model.Bundles[0].BundleFile);
         Assert.Equal("missing", model.Bundles[1].Badge);
         Assert.Equal("None in the Bundles folder", model.Bundles[1].BundleFile);
-        Assert.Equal("Ubuntu 26.04", model.Bundles[0].Target);
+        Assert.Equal("Ubuntu 24.04", model.Bundles[0].Target);
         Assert.Equal("git", model.Bundles[1].Dependencies);
         Assert.Equal("None", model.Bundles[0].Dependencies);
         Assert.Equal("Source control", Assert.Single(model.Bundles[0].Services).Description);
@@ -65,7 +65,7 @@ public sealed class MainViewModelTests
     [InlineData("Installed", "installed")]
     public void Row_ShowsTheBadge(string state, string badge)
     {
-        BundleRowViewModel row = new(new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 26.04", Requires = [], State = Enum.Parse<BundleStanding>(state) }, [], false);
+        BundleRowViewModel row = new(new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = Enum.Parse<BundleStanding>(state) }, [], false);
 
         Assert.Equal(badge, row.Badge);
         Assert.Equal(char.ToUpperInvariant(badge[0]) + badge[1..], row.Kind);

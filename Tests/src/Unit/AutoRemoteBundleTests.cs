@@ -85,7 +85,7 @@ public sealed class AutoRemoteBundleTests : IDisposable
     public void Describes_ItselfWithTheLinuxTargetAndTheBundlesItNeedsForTheLocalModel()
     {
         Assert.Equal("auto-remote", bundle.Name);
-        Assert.Equal("Ubuntu 26.04", bundle.Target);
+        Assert.Equal("Ubuntu 24.04", bundle.Target);
         Assert.Equal(["git", "dotnet", "ollama", "gemma", "open-code"], bundle.Requires);
         Assert.Equal(100, bundle.Order);
     }

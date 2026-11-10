@@ -1,6 +1,6 @@
 # Bundles
 
-Every bundle Bundler can build and install. Each has a Target, the system it is made for; all of them target Ubuntu 26.04 and the app does not check the system it installs on. A bundle is built on an online computer into one file, `<name>.bundle`, in the `Bundles` folder next to the app; that file is copied into the `Bundles` folder next to the app on the offline Ubuntu 26.04 computer. A build downloads the latest stable release of each component, so a file always holds the versions that were latest when it was built. Bundles have no version numbers of their own, only the versions of the services inside them (the Version column below, which are the ones of the files built between 2026-10-28 and 2026-11-03). Whether a file is newer than what is installed is for the person to judge, from when the file was last changed; moving to it means reinstalling the bundle, which uninstalls it and installs the new file.
+Every bundle Bundler can build and install. Each has a Target, the system it is made for; all of them target Ubuntu 24.04 and an install on another system only warns (the Ubuntu packages of a bundle fit the release it was built for, and apt refuses an install that would change or remove packages that are on the computer). A bundle is built on an online computer into one file, `<name>.bundle`, in the `Bundles` folder next to the app; that file is copied into the `Bundles` folder next to the app on the offline Ubuntu 24.04 computer. A build downloads the latest stable release of each component, so a file always holds the versions that were latest when it was built. Bundles have no version numbers of their own, only the versions of the services inside them (the Version column below, which are the ones of the files built between 2026-10-28 and 2026-11-10). Whether a file is newer than what is installed is for the person to judge, from when the file was last changed; moving to it means reinstalling the bundle, which uninstalls it and installs the new file.
 
 Scope: internal use inside one organization, on machines it owns, nothing redistributed (see `AGENTS.md`). **License** lists the licenses by short name; in the app, clicking one opens its full text (`licenses/texts/`). The text of a standard license is the standard text, the copyright line of each project is in its package. **Usage** says "Free use" when the licenses put no restriction on that scope, otherwise it lists the restrictions. "License review" below says where the licenses were read. This is not legal advice.
 
@@ -32,7 +32,7 @@ A bundle needs another only when its content or its setup uses it: the NuGet bun
 
 ## git
 
-The latest stable git, from the official git-core PPA built for Ubuntu 26.04. Replaces an older git from the Ubuntu archive.
+The latest stable git, from the official git-core PPA built for Ubuntu 24.04. Replaces an older git from the Ubuntu archive.
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
@@ -41,23 +41,23 @@ The latest stable git, from the official git-core PPA built for Ubuntu 26.04. Re
 
 ## a2000
 
-The NVIDIA Linux driver for the RTX A2000. The series is the one NVIDIA lists as its latest stable release (`latest.txt`, currently 595), installed from the packages Ubuntu builds from it. The kernel modules are prebuilt and signed by Canonical, so they load with Secure Boot on and need no compiler. They are built for a specific kernel, so the bundle brings that kernel (7.0.0-42) as well: after the install, restart, and the computer boots into it. Ubuntu's build can be a little behind NVIDIA's own latest number (595.99.02 against 595.104.02 at the last build); the build says so.
+The NVIDIA Linux driver for the RTX A2000. The series is the newest one Ubuntu 24.04 packages, at most the series NVIDIA lists as its latest stable release (`latest.txt`: 620 at the last build, while Ubuntu packages 615), installed from the packages Ubuntu builds from it. The kernel modules are prebuilt and signed by Canonical, so they load with Secure Boot on and need no compiler. They are built for one kernel, the 24.04 base kernel (6.8.0-149), so the bundle brings that kernel as well. After the install, restart; the install says which kernel the modules are for, and a computer that starts a newer one (an HWE kernel, for example) has to be told to start that one in the boot menu. Ubuntu's build is behind NVIDIA's own latest number; the build says so.
 
-The install reports the NVIDIA GPU it finds and warns if there is none or if it is not an RTX A2000 (it installs anyway). A newer driver that is already installed is kept. The driver itself could not be tried on a real A2000 (see `Docs/Usage.md`).
+The install reports the NVIDIA GPU it finds and warns if there is none or if it is not an RTX A2000 (it installs anyway). A newer driver that is already installed is kept. An older driver of another series (for example a 580 driver that Ubuntu installed, while the bundle brings 615) cannot be installed next to the bundle's, so its packages are removed first, logged, and not brought back by an uninstall; the same series is simply upgraded. The driver itself could not be tried on a real A2000 (see `Docs/Usage.md`).
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| NVIDIA driver | 595.99.02 | Userspace driver for the display and for compute (`nvidia-driver-595-open`, libnvidia-*, `nvidia-utils` with `nvidia-smi`, firmware). | NVIDIA-Driver-License | Only on infrastructure the organization owns or leases, and only with NVIDIA hardware (an RTX A2000 qualifies). Binaries must stay unmodified. Must not be distributed outside the organization. Section 16 requires notices when it is delivered to the U.S. Government. |
-| Open kernel modules | 595 | Prebuilt GPU kernel modules for Ubuntu's kernel (`linux-modules-nvidia-595-open`), signed by Canonical Ltd. Kernel Module Signing. | MIT, GPL-2.0 | Free use. |
-| Linux kernel | 7.0.0-42 | The kernel the modules were built for (`linux-image`, `linux-modules`). Installed next to the current kernel, which stays bootable. | GPL-2.0 | Free use. |
+| NVIDIA driver | 615.71.09 | Userspace driver for the display and for compute (`nvidia-driver-615-open`, libnvidia-*, `nvidia-utils` with `nvidia-smi`, firmware). | NVIDIA-Driver-License | Only on infrastructure the organization owns or leases, and only with NVIDIA hardware (an RTX A2000 qualifies). Binaries must stay unmodified. Must not be distributed outside the organization. Section 16 requires notices when it is delivered to the U.S. Government. |
+| Open kernel modules | 615 | Prebuilt GPU kernel modules for Ubuntu's kernel (`linux-modules-nvidia-615-open`), signed by Canonical Ltd. Kernel Module Signing. | MIT, GPL-2.0 | Free use. |
+| Linux kernel | 6.8.0-149 | The kernel the modules were built for (`linux-image`, `linux-modules`). Installed next to the current kernel, which stays bootable. | GPL-2.0 | Free use. |
 
 ## dotnet
 
-The .NET SDK and the offline NuGet feed, set up so that C# builds without internet: NuGet restore uses only the offline feed (machine-wide and for every user), and .NET telemetry is off.
+The .NET SDK and the offline NuGet feed, set up so that C# builds without internet: NuGet restore uses only the offline feed (machine-wide and for every user), and .NET telemetry is off. The SDK is the newest of the 10.0 channel (the long term support release, supported until 2028) on purpose, not the newest channel: the feed, the `dotnet new` templates and the other NuGet bundles are made for net10.0, and an SDK 11 cannot build net10.0 projects offline. Packages that follow the .NET release (`Microsoft.Extensions.*`, the runtime packs, EF Core and so on) are taken at their newest 10.x version for the same reason.
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| .NET SDK | 10.0.403 | Builds and runs C# projects. Includes runtime 10.0.14 and ASP.NET Core. | MIT | Free use. |
+| .NET SDK | 10.0.404 | Builds and runs C# projects. Includes runtime 10.0.15 and ASP.NET Core. | MIT | Free use. |
 | Offline NuGet feed | net10.0 | Basic .NET packages with their dependencies in `/opt/bundler/nuget-feed`: Microsoft.Extensions.*, System.CommandLine, System.IO.Ports, System.Reactive, System.Linq.Async, System.Drawing.Common, System.Text.Json, Microsoft.NET.Test.Sdk, the runtime, apphost and ILLink packs for linux-x64 and win-x64, and what the `dotnet new` console, classlib, worker, webapi, web, mvc, razor, blazor and grpc templates reference (list in `App/src/Resources/dotnet/packages.txt`). | MIT, Apache-2.0, BSD-3-Clause | Free use. |
 | Support libraries | - | What .NET needs to run (ICU, OpenSSL, tzdata, ca-certificates, ...); installed only when missing. | GPL-2.0, LGPL-2.1, MIT, BSD-3-Clause | Free use. |
 
@@ -67,7 +67,7 @@ Ollama as a local-only systemd service on `127.0.0.1:11434` (no cloud features, 
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Ollama | 0.40.14 | Local model server, a systemd service on `127.0.0.1:11434`. The tarball bundles NVIDIA CUDA runtime libraries. | MIT | The NVIDIA CUDA libraries in its tarball may only be used through Ollama, under the government restricted-rights terms of NVIDIA's CUDA license. |
+| Ollama | 0.40.16 | Local model server, a systemd service on `127.0.0.1:11434`. The tarball bundles NVIDIA CUDA runtime libraries. | MIT | The NVIDIA CUDA libraries in its tarball may only be used through Ollama, under the government restricted-rights terms of NVIDIA's CUDA license. |
 | Support libraries | - | zstd, to unpack the Ollama archive; installed only when missing. | BSD-3-Clause, GPL-2.0 | Free use. |
 
 ## vs-code
@@ -76,7 +76,7 @@ VS Code for every user, set up to work offline: it finds the .NET SDK and git, t
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Visual Studio Code | 1.144.1 | Code editor. | VSCode-License | Only to develop and test the organization's own applications, including inside its internal network. Must not be shared, published or offered to others. |
+| Visual Studio Code | 1.145.3 | Code editor. | VSCode-License | Only to develop and test the organization's own applications, including inside its internal network. Must not be shared, published or offered to others. |
 | C# extension | 2.160.4 | C# language support in VS Code, with its Roslyn language server and debugger. The C# Dev Kit is left out on purpose, see below. | CSharp-Extension-License | Only with VS Code or Visual Studio, to develop and test the organization's own applications. Must not be shared outside the organization. The bundled debugger has its own Microsoft terms of the same kind. |
 | .NET Install Tool | 3.2.0 | Lets the C# extension find the installed .NET (`ms-dotnettools.vscode-dotnet-runtime`). | MIT | Free use. |
 | Git Graph | 1.30.0 | Commit graph view in VS Code (`mhutchie.git-graph`). | GitGraph-License | MIT with an added sentence: "Permission is NOT GRANTED to publish, distribute, sublicense, and/or sell derivative works". Use, copy, modify and merge are allowed. Do not distribute modified copies outside the organization. |
@@ -140,11 +140,11 @@ Install the EF tool with `dotnet tool install --global dotnet-ef`; it comes from
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Microsoft.Data.Sqlite and EF Core SQLite | 10.0.14 | ADO.NET provider, EF Core provider (Microsoft.EntityFrameworkCore.Sqlite and .Design) and the EF tool package dotnet-ef. | MIT | Free use. |
+| Microsoft.Data.Sqlite and EF Core SQLite | 10.0.15 | ADO.NET provider, EF Core provider (Microsoft.EntityFrameworkCore.Sqlite and .Design) and the EF tool package dotnet-ef. | MIT | Free use. |
 | SQLitePCLRaw | 3.0.5 | Native SQLite for the .NET providers: the wrappers and the native SQLite builds. | MIT, Public-Domain | Free use. |
 | System.Data.SQLite | 2.0.4 | Another SQLite provider, with System.Data.SQLite.Core 1.0.119. | Public-Domain | Free use. |
 | sqlite-net-pcl | 1.11.285 | SQLite wrapper. | MIT | Free use. |
-| DB Browser for SQLite | 3.13.1 | Graphical SQLite database tool (the Ubuntu 26.04 package, which is the latest stable upstream release). | GPL-3.0, MPL-2.0 | Free use. |
+| DB Browser for SQLite | 3.12.2 | Graphical SQLite database tool (the Ubuntu 24.04 package). | GPL-3.0, MPL-2.0 | Free use. |
 
 ## godot
 
@@ -158,46 +158,46 @@ The Godot .NET edition (C# support) with the matching export templates, which ar
 
 ## podman
 
-The Podman container engine with what rootless containers need. The version is the one in the Ubuntu 26.04 archive: upstream is at 6.x, but for Linux it only publishes `podman-remote`, a client that needs a Podman service somewhere else, so the newest complete engine packaged for 26.04 is used. Accounts without a range of subordinate user and group ids get one (recorded, and taken away again on uninstall). No container images are included: `podman load` needs images from files. Images and volumes stay on uninstall.
+The Podman container engine with what rootless containers need. The version is the one in the Ubuntu 24.04 archive (4.9.3): upstream is at 6.x, but for Linux it only publishes `podman-remote`, a client that needs a Podman service somewhere else, so the newest complete engine packaged for 24.04 is used. Accounts without a range of subordinate user and group ids get one (recorded, and taken away again on uninstall). No container images are included: `podman load` needs images from files. Images and volumes stay on uninstall.
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Podman | 5.7.0 | Container engine (`podman`, `golang-github-containers-common`). | Apache-2.0 | Free use. |
-| conmon, netavark, aardvark-dns | 2.1.13, 1.16.1, 1.16.0 | Container monitor, network stack and DNS. | Apache-2.0 | Free use. |
-| crun | 1.21 | OCI runtime. | GPL-2.0, LGPL-2.1 | Free use. |
-| passt | 2026-01-20 | Rootless networking. | GPL-2.0, BSD-3-Clause | Free use. |
+| Podman | 4.9.3 | Container engine (`podman`, `golang-github-containers-common`). | Apache-2.0 | Free use. |
+| conmon, netavark, aardvark-dns | 2.1.10, 1.4.0, 1.4.0 | Container monitor, network stack and DNS. | Apache-2.0 | Free use. |
+| crun | 1.14.1 | OCI runtime. | GPL-2.0, LGPL-2.1 | Free use. |
+| passt | 2024-02-20 | Rootless networking. | GPL-2.0, BSD-3-Clause | Free use. |
 | Rootless support | - | uidmap, slirp4netns, catatonit and dbus-user-session; installed only when missing. | GPL-2.0, MIT | Free use. |
 
 ## gimp
 
-GIMP from the Ubuntu 26.04 archive, with the libraries it needs (GEGL, babl, poppler, OpenColorIO and others). GIMP is for retouching photos, compositing and graphics. The Debian copyright files of the program and its data package were searched for non-commercial, research-only or similar terms and have none.
+GIMP (2.10) from the Ubuntu 24.04 archive, with the libraries it needs (GEGL, babl, poppler and others). GIMP is for retouching photos, compositing and graphics. The Debian copyright files of the program and its data package were searched for non-commercial, research-only or similar terms and have none.
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| GIMP | 3.2.2 | Photo editor and graphics program (`gimp` and the libgimp libraries). | GPL-3.0, LGPL-3.0, LGPL-2.1, MIT, BSD-2-Clause | Free use. |
-| GIMP artwork | 3.2.2 | Brushes, patterns, icons and other artwork shipped with GIMP (`gimp-data`). | GPL-3.0, CC-BY-SA-4.0, CC-BY-SA-3.0, CC0-1.0 | Free use. |
-| Libraries | - | GEGL, babl, poppler, OpenColorIO and the other libraries GIMP needs; installed only when missing. | GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, MIT, BSD-3-Clause | Free use. The license differs per package. |
+| GIMP | 2.10.36 | Photo editor and graphics program (`gimp` and the libgimp libraries). | GPL-3.0, LGPL-3.0, LGPL-2.1, MIT, BSD-2-Clause | Free use. |
+| GIMP artwork | 2.10.36 | Brushes, patterns, icons and other artwork shipped with GIMP (`gimp-data`). | GPL-3.0, CC-BY-SA-4.0, CC-BY-SA-3.0, CC0-1.0 | Free use. |
+| Libraries | - | GEGL, babl, poppler and the other libraries GIMP needs; installed only when missing. | GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, MIT, BSD-3-Clause | Free use. The license differs per package. |
 
 ## krita
 
-Krita from the Ubuntu 26.04 archive, with the libraries it needs (Qt 6 and others). Krita is for painting, drawing and textures. The Debian copyright files of the program and its data package were searched for non-commercial, research-only or similar terms and have none.
+Krita (5.2) from the Ubuntu 24.04 archive, with the libraries it needs (Qt 5, KDE Frameworks and others). Krita is for painting, drawing and textures. The Debian copyright files of the program and its data package were searched for non-commercial, research-only or similar terms and have none.
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Krita | 6.0.1 | Painting and drawing program (`krita`). | GPL-3.0, GPL-2.0, LGPL-2.1, LGPL-3.0, MIT, BSD-3-Clause | Free use. |
-| Krita brushes and bundled code | 6.0.1 | Brushes, presets, patterns and small third-party libraries shipped with Krita (`krita-data`). | CC-BY-SA-3.0, CC0-1.0, BSL-1.0, NCSA, Unlicense | Free use. |
-| Libraries | - | Qt 6 and the other libraries Krita needs; installed only when missing. | GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, MIT, BSD-3-Clause | Free use. The license differs per package. |
+| Krita | 5.2.2 | Painting and drawing program (`krita`). | GPL-3.0, GPL-2.0, LGPL-2.1, LGPL-3.0, MIT, BSD-3-Clause | Free use. |
+| Krita brushes and bundled code | 5.2.2 | Brushes, presets, patterns and small third-party libraries shipped with Krita (`krita-data`). | CC-BY-SA-3.0, CC0-1.0, BSL-1.0, NCSA, Unlicense | Free use. |
+| Libraries | - | Qt 5 and the other libraries Krita needs; installed only when missing. | GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, MIT, BSD-3-Clause | Free use. The license differs per package. |
 
 ## blender
 
-Blender, the 3D modeling, sculpting, animation and rendering program, which exports glTF, FBX, OBJ and STL for games and apps (such as Godot). It comes from Blender's own Linux release archive, because the Ubuntu 26.04 archive is a release or two behind (5.0.1 against 5.2.3 at the last build); the archive is checked against the SHA-256 checksum Blender publishes. It is installed in `/opt/blender` with a `blender` command and a menu entry, and an install of a newer Blender replaces the older one. The archive carries its own license folder, which lists every library built into Blender; it was searched for non-commercial, research-only or similar terms and has none.
+Blender, the 3D modeling, sculpting, animation and rendering program, which exports glTF, FBX, OBJ and STL for games and apps (such as Godot). It comes from Blender's own Linux release archive, because the Ubuntu 24.04 archive is far behind (4.0.2 against 5.3.0 at the last build); the archive is checked against the SHA-256 checksum Blender publishes. It is installed in `/opt/blender` with a `blender` command and a menu entry, and an install of a newer Blender replaces the older one. The archive carries its own license folder, which lists every library built into Blender; it was searched for non-commercial, research-only or similar terms and has none.
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Blender | 5.2.3 | 3D modeling, sculpting, animation and rendering program. | GPL-3.0 | Free use. |
-| Libraries built into Blender | 5.2.3 | Image, video, geometry, physics and scripting libraries. | Apache-2.0, BSD-2-Clause, BSD-3-Clause, BSL-1.0, GPL-2.0, LGPL-2.1, LGPL-3.0, MIT, MPL-2.0, NCSA, Python-2.0, Zlib | Free use. |
-| Smaller library licenses | 5.2.3 | Licenses of smaller libraries and code in Blender (compression, PNG and TIFF, FreeType, OpenGL headers and others). | 0BSD, bzip2-1.0.6, FTL, libpng-2.0, libtiff, MIT-Khronos-old, SGI-B-2.0, TOST-1.0 | Free use. |
-| Fonts | 5.2.3 | The fonts of Blender's interface and text objects. | OFL-1.1, Bitstream-Vera, Arev-Fonts | Free use. |
+| Blender | 5.3.0 | 3D modeling, sculpting, animation and rendering program. | GPL-3.0 | Free use. |
+| Libraries built into Blender | 5.3.0 | Image, video, geometry, physics and scripting libraries. | Apache-2.0, BSD-2-Clause, BSD-3-Clause, BSL-1.0, GPL-2.0, LGPL-2.1, LGPL-3.0, MIT, MPL-2.0, NCSA, Python-2.0, Zlib | Free use. |
+| Smaller library licenses | 5.3.0 | Licenses of smaller libraries and code in Blender (compression, PNG and TIFF, FreeType, OpenGL headers and others). | 0BSD, bzip2-1.0.6, FTL, libpng-2.0, libtiff, MIT-Khronos-old, SGI-B-2.0, TOST-1.0 | Free use. |
+| Fonts | 5.3.0 | The fonts of Blender's interface and text objects. | OFL-1.1, Bitstream-Vera, Arev-Fonts | Free use. |
 | Support libraries | - | X11, OpenGL, Wayland and other system libraries the program needs, and xz to unpack it; installed only when missing. | GPL-2.0, LGPL-2.1, MIT, BSD-3-Clause | Free use. The license differs per package. |
 
 ## auto-remote
@@ -217,7 +217,7 @@ Where a license text or a metadata field was read for a service, and where it wa
 | Bundle | Service | Checked from |
 |---|---|---|
 | git | git | Debian copyright file (GPL-2.0, with LGPL-2.1+, Expat and ISC parts) |
-| a2000 | NVIDIA driver | `licenses/NVIDIA-Driver-License.txt` |
+| a2000 | NVIDIA driver | `licenses/NVIDIA-Driver-License.txt`; the 615 package carries the same license text (compared with the one read for the 595 package: nothing in the text on file is missing from it) |
 | dotnet | .NET SDK | `LICENSE.txt` in the tarball |
 | vs-code | Visual Studio Code | `licenses/VSCode-License.rtf` |
 | vs-code | C# extension | `licenses/CSharp-Extension-License.txt` |
@@ -235,12 +235,12 @@ Where a license text or a metadata field was read for a service, and where it wa
 | sqlite | sqlite-net-pcl | license text |
 | sqlite | DB Browser for SQLite | Debian copyright file (GPL-3.0-or-later and MPL-2.0) |
 | godot | Godot | upstream repository license; games exported with it carry Godot's license notices |
-| podman | Podman | Debian copyright file |
+| podman | Podman | Debian copyright file of podman 4.9.3 |
 | podman | conmon, netavark, aardvark-dns | Debian copyright files |
 | podman | crun | Debian copyright file (GPL-2.0+ and LGPL-2.1+) |
 | podman | passt | Debian copyright file (GPL-2.0+ and BSD-3-Clause) |
-| gimp | GIMP | Debian copyright files of gimp and gimp-data (GPL-3+, GPL-2+, LGPL-3+, MIT, Expat and BSD-2-clause code; artwork under CC-BY-SA-3.0, CC-BY-SA-4.0 and CC0-1.0); searched for non-commercial or similar terms, none found |
-| krita | Krita | Debian copyright files of krita and krita-data (GPL, LGPL, BSD, BSL-1.0, NCSA, Unlicense, CC-BY-SA-3.0, CC0-1.0, public domain); searched for non-commercial or similar terms, none found |
+| gimp | GIMP | Debian copyright files of gimp and gimp-data 2.10.36 (GPL-3+, GPL-2+, LGPL-3+, MIT, Expat and BSD-2-clause code; artwork under CC-BY-SA-3.0, CC-BY-SA-4.0 and CC0-1.0); searched for non-commercial or similar terms, none found |
+| krita | Krita | Debian copyright files of krita and krita-data 5.2.2 (GPL, LGPL, BSD, BSL-1.0, NCSA, Unlicense, CC-BY-SA-3.0, CC0-1.0, public domain); searched for non-commercial or similar terms, none found (the only hit is the Unlicense text itself, which allows commercial use) |
 | blender | Blender | the `license` folder inside the official release archive (`license.md`, `licenses.json`): Blender is GPL-3.0-or-later and the libraries inside it with their licenses are listed there; searched for non-commercial or similar terms, none found |
 | open-code | OpenCode | the repository `LICENSE` at the release tag (MIT) and the npm package metadata (MIT); not read: the licenses of the JavaScript dependencies compiled into the program, since the release carries no third-party notices file |
 | auto-remote | Auto Remote server and desktop client | the repository `LICENSE` (MIT) and the release's `THIRD-PARTY-NOTICES.txt` (both read; the notices list the .NET runtime, Live AI, Whisper.net, whisper.cpp and ggml, all MIT); the Whisper.net package's `LICENSE` read (MIT); the client's Avalonia (MIT), SkiaSharp and Skia (MIT, BSD-3-Clause) and Markdig (BSD-2-Clause) from their package metadata, not read in full, and the release's notices file does not cover the client; the voice model the server downloads at run time is not part of the bundle and was not reviewed |

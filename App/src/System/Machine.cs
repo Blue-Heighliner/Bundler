@@ -24,6 +24,9 @@ internal interface IMachine
     /// <summary>Gets the folder the application lives in.</summary>
     string ApplicationDirectory { get; }
 
+    /// <summary>Gets the name and version of the system this computer runs, such as <c>Ubuntu 24.04</c>, or <see langword="null" /> when it cannot be read.</summary>
+    string? SystemName { get; }
+
     /// <summary>Gets the folder the app keeps its cache and install records in: <c>BlueHeighliner.Bundler</c> inside root's app data folder, because the app always runs as root.</summary>
     string DataDirectory { get; }
 
@@ -63,6 +66,10 @@ internal sealed class Machine : IMachine
             : [Environment.ProcessPath ?? Environment.GetCommandLineArgs()[0]];
 
     /// <inheritdoc />
+    public string? SystemName
+        => File.Exists("/etc/os-release") ? SystemNameOf(File.ReadAllText("/etc/os-release")) : null;
+
+    /// <inheritdoc />
     public string ApplicationDirectory => AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
 
     /// <inheritdoc />
@@ -79,6 +86,17 @@ internal sealed class Machine : IMachine
 
     /// <inheritdoc />
     public string HomeDirectory => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+    /// <summary>
+    /// Reads the name and version out of the text of an <c>os-release</c> file.
+    /// </summary>
+    /// <param name="osRelease">The file's text.</param>
+    /// <returns>The name and version, such as <c>Ubuntu 24.04</c>, or <see langword="null" /> when either is missing.</returns>
+    public string? SystemNameOf(string osRelease)
+    {
+        Dictionary<string, string> fields = osRelease.Split('\n').Select(line => line.Split('=', 2)).Where(parts => parts.Length == 2).ToDictionary(parts => parts[0].Trim(), parts => parts[1].Trim().Trim('"'), StringComparer.Ordinal);
+        return fields.TryGetValue("NAME", out string? name) && fields.TryGetValue("VERSION_ID", out string? version) ? $"{name} {version}" : null;
+    }
 
     /// <inheritdoc />
     public string? FindExecutable(string name)

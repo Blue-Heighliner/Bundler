@@ -139,4 +139,93 @@ public sealed class ReleaseSourcesTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => sources.NewestGitHub("o/r", @"^v(2\.\d+\.\d+)$", ["^nothing$"]));
     }
+
+    private void DotNetIndex()
+    {
+        http.Setup(h => h.GetJson("https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json", null, It.IsAny<CancellationToken>())).ReturnsAsync(JsonNode.Parse("""
+            { "releases-index": [
+              { "channel-version": "12.0", "support-phase": "preview", "releases.json": "https://example.com/12.json" },
+              { "channel-version": "11.0", "support-phase": "active", "releases.json": "https://example.com/11.json" },
+              { "channel-version": "10.0", "support-phase": "active", "releases.json": "https://example.com/10.json" },
+              { "channel-version": "8.0", "support-phase": "eol", "releases.json": "https://example.com/8.json" } ] }
+            """)!);
+        foreach ((string channel, string sdk) in new[] { ("11", "11.0.100"), ("10", "10.0.404") })
+        {
+            http.Setup(h => h.GetJson($"https://example.com/{channel}.json", null, It.IsAny<CancellationToken>())).ReturnsAsync(JsonNode.Parse($$"""
+                { "latest-sdk": "{{sdk}}", "releases": [ { "release-version": "{{channel}}.0.1", "sdk": { "version": "{{sdk}}", "files": [
+                  { "name": "dotnet-sdk-linux-x64.tar.gz", "url": "https://example.com/{{sdk}}.tar.gz", "hash": "ABCD" } ] } } ] }
+                """)!);
+        }
+    }
+
+    [Fact]
+    public async Task LatestDotNet_WithoutAChannel_TakesTheNewestSupportedOne()
+    {
+        DotNetIndex();
+
+        DotNetRelease release = await sources.LatestDotNet();
+
+        Assert.Equal("11.0", release.Channel);
+        Assert.Equal("11.0.100", release.Version);
+    }
+
+    [Fact]
+    public async Task LatestDotNet_WithAChannel_TakesThatChannelEvenWhenANewerOneIsSupported()
+    {
+        DotNetIndex();
+
+        DotNetRelease release = await sources.LatestDotNet("10.0");
+
+        Assert.Equal("10.0", release.Channel);
+        Assert.Equal("10.0.404", release.Version);
+        Assert.Equal("abcd", release.Hash.Hex);
+    }
+
+    [Theory]
+    [InlineData("12.0")]
+    [InlineData("8.0")]
+    [InlineData("99.0")]
+    public async Task LatestDotNet_ChannelThatIsNotSupported_Throws(string channel)
+    {
+        DotNetIndex();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sources.LatestDotNet(channel));
+    }
+
+    private void NuGetIndex()
+        => http.Setup(h => h.GetJson("https://api.nuget.org/v3-flatcontainer/some.package/index.json", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(JsonNode.Parse("""{ "versions": [ "9.0.5", "10.0.14", "10.0.15", "10.1.0-preview.1", "11.0.0" ] }""")!);
+
+    [Fact]
+    public async Task LatestNuGet_WithoutARange_TakesTheHighestStableVersion()
+    {
+        NuGetIndex();
+
+        Assert.Equal("11.0.0", await sources.LatestNuGet("Some.Package"));
+    }
+
+    [Fact]
+    public async Task LatestNuGet_WithARange_TakesTheHighestStableVersionInIt()
+    {
+        NuGetIndex();
+
+        Assert.Equal("10.0.15", await sources.LatestNuGet("Some.Package", "10.*"));
+    }
+
+    [Fact]
+    public async Task LatestNuGet_RangeWithoutAStableVersion_ReturnsNull()
+    {
+        NuGetIndex();
+
+        Assert.Null(await sources.LatestNuGet("Some.Package", "12.*"));
+    }
+
+    [Fact]
+    public async Task LatestNuGet_RangeDoesNotMatchAHigherMajorThatStartsWithTheSameDigits()
+    {
+        http.Setup(h => h.GetJson("https://api.nuget.org/v3-flatcontainer/some.package/index.json", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(JsonNode.Parse("""{ "versions": [ "1.2.0", "10.0.0", "100.0.0" ] }""")!);
+
+        Assert.Equal("1.2.0", await sources.LatestNuGet("Some.Package", "1.*"));
+    }
 }

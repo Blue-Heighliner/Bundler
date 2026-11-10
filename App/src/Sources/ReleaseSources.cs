@@ -6,12 +6,14 @@ namespace BlueHeighliner.Bundler;
 internal interface IReleaseSources
 {
     /// <summary>
-    /// Finds the newest SDK of the newest .NET channel that is in active or maintenance support. Previews, release candidates
-    /// and go-live builds of the next version do not count as stable.
+    /// Finds the newest SDK of a .NET channel that is in active or maintenance support: the channel that is asked for, otherwise
+    /// the newest one. Previews, release candidates and go-live builds of the next version do not count as stable.
     /// </summary>
+    /// <param name="channel">The channel, such as <c>10.0</c>, or <see langword="null" /> for the newest.</param>
     /// <param name="cancellation">Stops the lookup when cancelled.</param>
     /// <returns>The release.</returns>
-    Task<DotNetRelease> LatestDotNet(CancellationToken cancellation = default);
+    /// <exception cref="InvalidOperationException">The channel is not in active or maintenance support or has no Linux x64 SDK.</exception>
+    Task<DotNetRelease> LatestDotNet(string? channel = null, CancellationToken cancellation = default);
 
     /// <summary>
     /// Finds the latest stable VS Code <c>.deb</c>.
@@ -66,9 +68,10 @@ internal interface IReleaseSources
     /// Finds the highest stable version of a NuGet package.
     /// </summary>
     /// <param name="packageId">The package id.</param>
+    /// <param name="range">A version prefix with a star, such as <c>10.*</c>, that limits the search to the versions it covers (for packages that have to match a .NET release), or <see langword="null" /> for any.</param>
     /// <param name="cancellation">Stops the lookup when cancelled.</param>
-    /// <returns>The version, or <see langword="null" /> when the package does not exist or has no stable release.</returns>
-    Task<string?> LatestNuGet(string packageId, CancellationToken cancellation = default);
+    /// <returns>The version, or <see langword="null" /> when the package does not exist or has no stable release in the range.</returns>
+    Task<string?> LatestNuGet(string packageId, string? range = null, CancellationToken cancellation = default);
 
     /// <summary>
     /// Reads the driver version NVIDIA lists as its latest stable release.
@@ -82,15 +85,15 @@ internal interface IReleaseSources
 internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IReleaseSources
 {
     /// <inheritdoc />
-    public async Task<DotNetRelease> LatestDotNet(CancellationToken cancellation = default)
+    public async Task<DotNetRelease> LatestDotNet(string? channel = null, CancellationToken cancellation = default)
     {
         JsonNode index = await http.GetJson("https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json", cancellation: cancellation);
-        JsonNode channel = index["releases-index"]!.AsArray()
-            .Where(node => node!["support-phase"]!.GetValue<string>() is "active" or "maintenance")
+        JsonNode selected = index["releases-index"]!.AsArray()
+            .Where(node => (node!["support-phase"]!.GetValue<string>() is "active" or "maintenance") && (channel is null || node["channel-version"]!.GetValue<string>() == channel))
             .OrderBy(node => node!["channel-version"]!.GetValue<string>(), Comparer<string>.Create(versions.Compare))
-            .Last()!;
+            .LastOrDefault() ?? throw new InvalidOperationException($".NET channel {channel} is not in active or maintenance support");
 
-        JsonNode releases = await http.GetJson(channel["releases.json"]!.GetValue<string>(), cancellation: cancellation);
+        JsonNode releases = await http.GetJson(selected["releases.json"]!.GetValue<string>(), cancellation: cancellation);
         string sdkVersion = releases["latest-sdk"]!.GetValue<string>();
         foreach (JsonNode? release in releases["releases"]!.AsArray())
         {
@@ -103,7 +106,7 @@ internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IR
                     {
                         return new()
                         {
-                            Channel = channel["channel-version"]!.GetValue<string>(),
+                            Channel = selected["channel-version"]!.GetValue<string>(),
                             Version = sdkVersion,
                             Runtime = release["release-version"]!.GetValue<string>(),
                             Url = file["url"]!.GetValue<string>(),
@@ -213,12 +216,12 @@ internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IR
     }
 
     /// <inheritdoc />
-    public async Task<string?> LatestNuGet(string packageId, CancellationToken cancellation = default)
+    public async Task<string?> LatestNuGet(string packageId, string? range = null, CancellationToken cancellation = default)
     {
         try
         {
             JsonNode index = await http.GetJson($"https://api.nuget.org/v3-flatcontainer/{packageId.ToLowerInvariant()}/index.json", cancellation: cancellation);
-            return index["versions"]!.AsArray().Select(node => node!.GetValue<string>()).Where(version => !version.Contains('-'))
+            return index["versions"]!.AsArray().Select(node => node!.GetValue<string>()).Where(version => !version.Contains('-') && (range is null || version.StartsWith(range.TrimEnd('*'), StringComparison.Ordinal)))
                 .OrderBy(version => version, Comparer<string>.Create(versions.Compare)).LastOrDefault();
         }
         catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)

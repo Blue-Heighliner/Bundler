@@ -1,7 +1,7 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// A bundle of one program and its libraries from the Ubuntu 26.04 archive.
+/// A bundle of one program and its libraries from the Ubuntu 24.04 archive.
 /// </summary>
 internal abstract class AptProgramBundle(IAptBuilder apt, IAptInstaller installer, ILog log) : BundleBase
 {

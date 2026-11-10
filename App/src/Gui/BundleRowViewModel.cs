@@ -16,7 +16,7 @@ internal sealed class BundleRowViewModel(BundleStatus status, IReadOnlyList<Serv
     /// <summary>Gets the description.</summary>
     public string Description => status.Description;
 
-    /// <summary>Gets the system the bundle is made for, such as <c>Ubuntu 26.04</c>.</summary>
+    /// <summary>Gets the system the bundle is made for, such as <c>Ubuntu 24.04</c>.</summary>
     public string Target => status.Target;
 
     /// <summary>Gets the bundles it needs, as text.</summary>
