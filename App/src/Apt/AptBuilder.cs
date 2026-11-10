@@ -162,16 +162,25 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
         }
 
         HashSet<string> baseSystem = await BaseSystem(plan.Select(item => item.Name), cancellation);
-        HashSet<string> releaseVersions = await ReleaseVersions(baseSystem, cancellation);
+        Dictionary<string, string> releaseVersions = await ReleaseVersions(plan.Select(item => item.Name).Except(localNames), cancellation);
+        HashSet<string> serviceNames = [.. request.Services.Select(package => names[package])];
+        HashSet<(string Name, string Version)> extras = [];
         foreach ((string name, string version) in plan)
         {
-            if ((baseSystem.Contains(name) && releaseVersions.Contains($"{name} {version}")) || localNames.Contains(name))
+            bool isRelease = releaseVersions.TryGetValue(name, out string? released) && released == version;
+            if ((baseSystem.Contains(name) && isRelease) || localNames.Contains(name))
             {
                 continue;
             }
 
             log.Info($"{name} {version}");
             await runner.Run(new() { FileName = "apt-get", Arguments = [.. Options, "-qq", "download", $"{name}={version}"], WorkingDirectory = directory }, cancellation);
+            if (!isRelease && released is not null && !baseSystem.Contains(name) && !serviceNames.Contains(name))
+            {
+                log.Info($"{name} {released} (the release version, for a computer that has not updated it)");
+                await runner.Run(new() { FileName = "apt-get", Arguments = [.. Options, "-qq", "download", $"{name}={released}"], WorkingDirectory = directory }, cancellation);
+                extras.Add((name, released));
+            }
         }
 
         foreach (string file in Directory.EnumerateFiles(directory, "*%3a*.deb"))
@@ -181,7 +190,7 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
 
         await File.WriteAllLinesAsync(Path.Combine(directory, "top-level.txt"), request.Services.Select(package => names[package]), cancellation);
         await File.WriteAllLinesAsync(Path.Combine(directory, "support.txt"), request.Support.Select(package => names[package]), cancellation);
-        return await index.Write(directory, cancellation);
+        return [.. (await index.Write(directory, cancellation)).Where(package => !extras.Contains((package.Package, package.Version)))];
     }
 
     [GeneratedRegex(@"^Inst (?<name>\S+) \((?<version>\S+) ", RegexOptions.Multiline)]
@@ -221,22 +230,28 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
         return baseSystem;
     }
 
-    private async Task<HashSet<string>> ReleaseVersions(HashSet<string> names, CancellationToken cancellation)
+    private async Task<Dictionary<string, string>> ReleaseVersions(IEnumerable<string> names, CancellationToken cancellation)
     {
-        HashSet<string> released = [];
-        if (names.Count == 0)
+        Dictionary<string, string> released = [];
+        string[] wanted = [.. names.Distinct()];
+        if (wanted.Length == 0)
         {
             return released;
         }
 
-        ProcessResult madison = await runner.Run(new() { FileName = "apt-cache", Arguments = [.. Options, "madison", .. names], Check = false }, cancellation);
+        ProcessResult madison = await runner.Run(new() { FileName = "apt-cache", Arguments = [.. Options, "madison", .. wanted], Check = false }, cancellation);
         foreach (string line in madison.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             string[] fields = line.Split('|');
             string[] source = fields.Length >= 3 ? fields[2].Trim().Split(' ') : [];
             if (source.Length >= 2 && source[1].StartsWith(Release + "/", StringComparison.Ordinal))
             {
-                released.Add($"{fields[0].Trim()} {fields[1].Trim()}");
+                string name = fields[0].Trim();
+                string version = fields[1].Trim();
+                if (!released.TryGetValue(name, out string? known) || versions.CompareDebian(version, known) > 0)
+                {
+                    released[name] = version;
+                }
             }
         }
 

@@ -66,7 +66,7 @@ internal interface IMainViewModel : INotifyPropertyChanged
     void SelectAll(bool selected);
 
     /// <summary>
-    /// Builds the ticked bundles into the bundles folder. Any number of bundles can be ticked, but only one action (build, install
+    /// Builds the ticked bundles into the Bundles folder. Any number of bundles can be ticked, but only one action (build, install
     /// uninstall or reinstall) runs at a time: this does nothing while another one runs.
     /// </summary>
     /// <returns>A task that completes when the work ends.</returns>

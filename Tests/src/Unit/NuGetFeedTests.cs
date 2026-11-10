@@ -3,13 +3,14 @@ namespace BlueHeighliner.Bundler.Tests;
 public sealed class NuGetFeedTests : IDisposable
 {
     private readonly TempDirectory directory = new();
+    private readonly Mock<IUsers> users = new();
     private readonly NuGetFeed feed;
 
     public NuGetFeedTests()
     {
         Mock<IPaths> paths = new();
         paths.SetupGet(p => p.NuGetFeed).Returns(directory.Combine("feed"));
-        feed = new(paths.Object, Mock.Of<IUsers>(), new Versions());
+        feed = new(paths.Object, users.Object, new Versions());
     }
 
     public void Dispose()
@@ -80,5 +81,28 @@ public sealed class NuGetFeedTests : IDisposable
 
         feed.Remove(c);
         Assert.False(Directory.Exists(directory.Combine("feed", "common")));
+    }
+
+    [Fact]
+    public async Task InstallTemplate_InstallsFromACopyTheUserCanReadAndRemovesIt()
+    {
+        string nupkg = directory.Write("state/pack.1.0.nupkg", "pack");
+        string? seen = null;
+        bool readable = false;
+        users.Setup(u => u.RunAs("alice", false, "dotnet", It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(
+            (string _, bool _, string _, IReadOnlyList<string> arguments, CancellationToken _) =>
+            {
+                seen = arguments[2];
+                readable = File.Exists(seen) && File.GetUnixFileMode(seen).HasFlag(UnixFileMode.OtherRead) && File.GetUnixFileMode(Path.GetDirectoryName(seen)!).HasFlag(UnixFileMode.OtherExecute);
+                return new ProcessResult(0, string.Empty, string.Empty);
+            });
+
+        bool installed = await feed.InstallTemplate("alice", nupkg);
+
+        Assert.True(installed);
+        Assert.NotEqual(nupkg, seen);
+        Assert.True(readable);
+        Assert.EndsWith("pack.1.0.nupkg", seen);
+        Assert.False(File.Exists(seen));
     }
 }

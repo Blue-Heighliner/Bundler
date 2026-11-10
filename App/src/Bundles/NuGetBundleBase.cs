@@ -9,7 +9,7 @@ internal abstract class NuGetBundleBase(INuGetBundleBuilder builder, INuGetBundl
     protected abstract NuGetBundleSpec Spec { get; }
 
     /// <inheritdoc />
-    public override IReadOnlyList<string> Requires { get; } = ["dev"];
+    public override IReadOnlyList<string> Requires { get; } = ["dotnet"];
 
     /// <inheritdoc />
     public override async Task<BuildResult> Build(string directory, CancellationToken cancellation = default)

@@ -1,7 +1,7 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// Gemma 4 26B-A4B (25.2B parameters, Q4_K_M) for Ollama, set as the model of Cline in VS Code. An identical model that is
+/// Gemma 4 26B-A4B (25.2B parameters, Q4_K_M) for Ollama, set as the model of Cline. An identical model that is
 /// already installed is skipped; a changed model of the same name replaces the old one.
 /// </summary>
 internal sealed class GemmaBundle(IOllamaRegistry registry, IHashing hashing, IUsers users, IUserFiles userFiles, ISystemd systemd, IProcessRunner runner, IVersions versions, ILog log) : BundleBase
@@ -18,13 +18,13 @@ internal sealed class GemmaBundle(IOllamaRegistry registry, IHashing hashing, IU
     public override string Name => "gemma";
 
     /// <inheritdoc />
-    public override string Description => "A local AI model that helps write code in VS Code, running entirely on this computer.";
+    public override string Description => "A local AI model for writing code and working on projects, running entirely on this computer.";
 
     /// <inheritdoc />
     public override int Order => 30;
 
     /// <inheritdoc />
-    public override IReadOnlyList<string> Requires { get; } = ["dev"];
+    public override IReadOnlyList<string> Requires { get; } = ["ollama"];
 
     /// <inheritdoc />
     public override IReadOnlyList<string> Resumable { get; } = ["ollama-models"];
@@ -121,12 +121,12 @@ internal sealed class GemmaBundle(IOllamaRegistry registry, IHashing hashing, IU
         else if (!string.IsNullOrEmpty(manifest) && File.Exists(manifest))
         {
             string[] digests = Digests(File.ReadAllText(manifest)).ToArray();
-            File.Delete(manifest);
-            File.Delete(Path.Combine(models, "manifests-v2", Path.GetRelativePath(Path.Combine(models, "manifests"), manifest)));
+            File.DeleteIfPresent(manifest);
+            File.DeleteIfPresent(Path.Combine(models, "manifests-v2", Path.GetRelativePath(Path.Combine(models, "manifests"), manifest)));
             RemoveUnused(digests);
         }
 
-        File.Delete(dropIn);
+        File.DeleteIfPresent(dropIn);
         await systemd.Reload(cancellation);
         await systemd.Control("restart", "ollama", cancellation);
     }
@@ -151,7 +151,7 @@ internal sealed class GemmaBundle(IOllamaRegistry registry, IHashing hashing, IU
         ProcessResult version = await runner.Try("ollama", ["--version"]);
         if (!version.Success && version.ExitCode == 127)
         {
-            throw new InvalidOperationException("Ollama is not installed (install the dev bundle first)");
+            throw new InvalidOperationException("Ollama is not installed (install the ollama bundle first)");
         }
 
         string have = versions.Find(version.Output + version.Error);
@@ -169,14 +169,16 @@ internal sealed class GemmaBundle(IOllamaRegistry registry, IHashing hashing, IU
 
     private async Task CopyModel(InstallContext install, string source, string manifest, string[] blobs, long bytes, string? oldManifest, CancellationToken cancellation)
     {
+        // On one disk the files are renamed, not copied, so only a margin is needed.
+        bool sameDisk = await Device(install.Payload) == await Device(models);
+        long needed = sameDisk ? 2_000_000_000 : bytes + 2_000_000_000;
         long free = new DriveInfo(models).AvailableFreeSpace;
-        if (free < bytes + 2_000_000_000)
+        if (free < needed)
         {
-            throw new InvalidOperationException($"not enough free space for the model: {free / 1_000_000_000} GB free, {(bytes + 2_000_000_000) / 1_000_000_000} GB needed");
+            throw new InvalidOperationException($"not enough free space for the model: {free / 1_000_000_000} GB free, {needed / 1_000_000_000} GB needed");
         }
 
         log.Step($"Copying {blobs.Length} model files ({bytes} bytes)");
-        bool sameDisk = await Device(install.Payload) == await Device(models);
         for (int index = 0; index < blobs.Length; index++)
         {
             string hex = blobs[index];
@@ -215,8 +217,8 @@ internal sealed class GemmaBundle(IOllamaRegistry registry, IHashing hashing, IU
                 .SelectMany(folder => Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)).Any(file => File.ReadAllText(file).Contains("sha256:" + hex, StringComparison.Ordinal));
             if (!used)
             {
-                File.Delete(BlobPath(hex));
-                File.Delete(Path.Combine(models, "metadata", $"sha256-{hex}.json"));
+                File.DeleteIfPresent(BlobPath(hex));
+                File.DeleteIfPresent(Path.Combine(models, "metadata", $"sha256-{hex}.json"));
             }
         }
     }

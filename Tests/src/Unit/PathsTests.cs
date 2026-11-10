@@ -22,7 +22,7 @@ public sealed class PathsTests
         Mock<IMachine> machine = new();
         machine.SetupGet(m => m.ApplicationDirectory).Returns("/opt/bundler");
 
-        Assert.Equal("/opt/bundler/bundles", new Paths(machine.Object).Bundles);
+        Assert.Equal("/opt/bundler/Bundles", new Paths(machine.Object).Bundles);
     }
 
     [Fact]

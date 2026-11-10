@@ -33,11 +33,11 @@ internal sealed class BundleRowViewModel(BundleStatus status, IReadOnlyList<Serv
         _ => "Available",
     };
 
-    /// <summary>Gets the text of the badge: <c>missing</c> (no file in the bundles folder), <c>available</c> (a file that is not installed yet) or <c>installed</c>.</summary>
+    /// <summary>Gets the text of the badge: <c>missing</c> (no file in the Bundles folder), <c>available</c> (a file that is not installed yet) or <c>installed</c>.</summary>
     public string Badge => Kind.ToLowerInvariant();
 
-    /// <summary>Gets when the bundle file in the bundles folder was last changed, as date and time, or a note that there is no file.</summary>
-    public string BundleFile => status.FileModified is DateTime time ? time.ToString("yyyy-MM-dd HH:mm") : "None in the bundles folder";
+    /// <summary>Gets when the bundle file in the Bundles folder was last changed, as date and time, or a note that there is no file.</summary>
+    public string BundleFile => status.FileModified is DateTime time ? time.ToString("yyyy-MM-dd HH:mm") : "None in the Bundles folder";
 
     /// <summary>Gets or sets a value indicating whether the row is ticked.</summary>
     public bool IsSelected

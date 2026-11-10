@@ -31,12 +31,36 @@ internal interface IReleaseSources
     Task<GitHubRelease> LatestGitHub(string repository, IReadOnlyList<string> patterns, CancellationToken cancellation = default);
 
     /// <summary>
+    /// Finds the newest release of a GitHub repository whose tag matches a pattern and that is not a pre-release or a draft, for a
+    /// repository whose "latest" release is not the newest one (it publishes several lines of versions) or that has to stay on one
+    /// major version.
+    /// </summary>
+    /// <param name="repository">The repository, <c>owner/name</c>.</param>
+    /// <param name="tagPattern">A regular expression a tag has to match, in which the first group is the version.</param>
+    /// <param name="patterns">One regular expression per wanted asset; the first asset whose name matches is taken.</param>
+    /// <param name="cancellation">Stops the lookup when cancelled.</param>
+    /// <returns>The release.</returns>
+    /// <exception cref="InvalidOperationException">No stable release matches or an asset is missing.</exception>
+    Task<GitHubRelease> NewestGitHub(string repository, string tagPattern, IReadOnlyList<string> patterns, CancellationToken cancellation = default);
+
+    /// <summary>
     /// Finds the newest Blender release that has a Linux x64 archive. download.blender.org only lists releases, never previews.
     /// </summary>
     /// <param name="cancellation">Stops the lookup when cancelled.</param>
     /// <returns>The release.</returns>
     /// <exception cref="InvalidOperationException">No release with a Linux x64 archive and a checksum is found.</exception>
     Task<BlenderRelease> LatestBlender(CancellationToken cancellation = default);
+
+    /// <summary>
+    /// Finds a release of a GitHub repository by its tag, for a component that is pinned to one version on purpose.
+    /// </summary>
+    /// <param name="repository">The repository, <c>owner/name</c>.</param>
+    /// <param name="tag">The release tag.</param>
+    /// <param name="patterns">One regular expression per wanted asset; the first asset whose name matches is taken.</param>
+    /// <param name="cancellation">Stops the lookup when cancelled.</param>
+    /// <returns>The release.</returns>
+    /// <exception cref="InvalidOperationException">The release is a draft or an asset is missing.</exception>
+    Task<GitHubRelease> GitHubTag(string repository, string tag, IReadOnlyList<string> patterns, CancellationToken cancellation = default);
 
     /// <summary>
     /// Finds the highest stable version of a NuGet package.
@@ -118,20 +142,48 @@ internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IR
             throw new InvalidOperationException($"{repository}: the latest release is not a stable release");
         }
 
-        List<DownloadAsset> assets = [];
-        foreach (string pattern in patterns)
+        return new() { Tag = tag, Assets = Assets(release, repository, tag, patterns) };
+    }
+
+    /// <inheritdoc />
+    public async Task<GitHubRelease> GitHubTag(string repository, string tag, IReadOnlyList<string> patterns, CancellationToken cancellation = default)
+    {
+        JsonNode release = await http.GetJson($"https://api.github.com/repos/{repository}/releases/tags/{tag}", null, cancellation);
+        if (release["draft"]?.GetValue<bool>() == true)
         {
-            JsonNode asset = release["assets"]!.AsArray().FirstOrDefault(node => Regex.IsMatch(node!["name"]!.GetValue<string>(), pattern))
-                ?? throw new InvalidOperationException($"{repository} {tag}: no asset matches {pattern}");
-            assets.Add(new()
-            {
-                FileName = asset["name"]!.GetValue<string>(),
-                Url = asset["browser_download_url"]!.GetValue<string>(),
-                Hash = HashSpec.Parse(asset["digest"]?.GetValue<string>()),
-            });
+            throw new InvalidOperationException($"{repository} {tag}: the release is a draft");
         }
 
-        return new() { Tag = tag, Assets = assets };
+        return new() { Tag = tag, Assets = Assets(release, repository, tag, patterns) };
+    }
+
+    /// <inheritdoc />
+    public async Task<GitHubRelease> NewestGitHub(string repository, string tagPattern, IReadOnlyList<string> patterns, CancellationToken cancellation = default)
+    {
+        JsonNode releases = await http.GetJson($"https://api.github.com/repos/{repository}/releases?per_page=100", null, cancellation);
+        (JsonNode release, string tag, string version)? newest = null;
+        foreach (JsonNode? node in releases.AsArray())
+        {
+            string tag = node!["tag_name"]!.GetValue<string>();
+            Match match = Regex.Match(tag, tagPattern);
+            if (!match.Success || node["prerelease"]?.GetValue<bool>() == true || node["draft"]?.GetValue<bool>() == true)
+            {
+                continue;
+            }
+
+            string version = match.Groups[1].Value;
+            if (newest is null || versions.Compare(version, newest.Value.version) > 0)
+            {
+                newest = (node, tag, version);
+            }
+        }
+
+        if (newest is null)
+        {
+            throw new InvalidOperationException($"{repository}: no stable release has a tag that matches {tagPattern}");
+        }
+
+        return new() { Tag = newest.Value.tag, Assets = Assets(newest.Value.release, repository, newest.Value.tag, patterns) };
     }
 
     /// <inheritdoc />
@@ -185,5 +237,23 @@ internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IR
         }
 
         return text;
+    }
+
+    private List<DownloadAsset> Assets(JsonNode release, string repository, string tag, IReadOnlyList<string> patterns)
+    {
+        List<DownloadAsset> assets = [];
+        foreach (string pattern in patterns)
+        {
+            JsonNode asset = release["assets"]!.AsArray().FirstOrDefault(node => Regex.IsMatch(node!["name"]!.GetValue<string>(), pattern))
+                ?? throw new InvalidOperationException($"{repository} {tag}: no asset matches {pattern}");
+            assets.Add(new()
+            {
+                FileName = asset["name"]!.GetValue<string>(),
+                Url = asset["browser_download_url"]!.GetValue<string>(),
+                Hash = HashSpec.Parse(asset["digest"]?.GetValue<string>()),
+            });
+        }
+
+        return assets;
     }
 }

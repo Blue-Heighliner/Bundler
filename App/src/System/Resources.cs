@@ -13,6 +13,14 @@ internal interface IResources
     /// <returns>The text.</returns>
     /// <exception cref="FileNotFoundException">There is no such file.</exception>
     string Text(string name);
+
+    /// <summary>
+    /// Reads an embedded binary file, such as an icon.
+    /// </summary>
+    /// <param name="name">The path below <c>Resources/</c>, such as <c>auto-remote/icon.png</c>.</param>
+    /// <returns>The content.</returns>
+    /// <exception cref="FileNotFoundException">There is no such file.</exception>
+    ReadOnlyMemory<byte> Bytes(string name);
 }
 
 /// <inheritdoc />
@@ -25,5 +33,15 @@ internal sealed class Resources : IResources
             ?? throw new FileNotFoundException($"embedded file {name} not found");
         using StreamReader reader = new(stream);
         return reader.ReadToEnd();
+    }
+
+    /// <inheritdoc />
+    public ReadOnlyMemory<byte> Bytes(string name)
+    {
+        using Stream stream = typeof(Resources).Assembly.GetManifestResourceStream("Resources/" + name)
+            ?? throw new FileNotFoundException($"embedded file {name} not found");
+        using MemoryStream memory = new();
+        stream.CopyTo(memory);
+        return memory.ToArray();
     }
 }

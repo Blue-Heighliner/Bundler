@@ -9,7 +9,7 @@ internal interface INuGetFeed
     /// <summary>Gets the feed folder.</summary>
     string Directory { get; }
 
-    /// <summary>Gets a value indicating whether the feed exists (the dev bundle creates it).</summary>
+    /// <summary>Gets a value indicating whether the feed exists (the dotnet bundle creates it).</summary>
     bool Exists { get; }
 
     /// <summary>
@@ -187,7 +187,22 @@ internal sealed class NuGetFeed(IPaths paths, IUsers users, IVersions versions) 
 
     /// <inheritdoc />
     public async Task<bool> InstallTemplate(string user, string nupkg, CancellationToken cancellation = default)
-        => (await users.RunAs(user, false, "dotnet", ["new", "install", nupkg, "--force"], cancellation)).Success;
+    {
+        // The state folder is under root's home, which the user cannot read, so the user installs the pack from a copy outside it.
+        DirectoryInfo staged = System.IO.Directory.CreateTempSubdirectory("bundler-template-");
+        try
+        {
+            string copy = Path.Combine(staged.FullName, Path.GetFileName(nupkg));
+            File.Copy(nupkg, copy);
+            File.SetUnixFileMode(staged.FullName, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+            File.SetUnixFileMode(copy, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+            return (await users.RunAs(user, false, "dotnet", ["new", "install", copy, "--force"], cancellation)).Success;
+        }
+        finally
+        {
+            staged.Delete(recursive: true);
+        }
+    }
 
     /// <inheritdoc />
     public async Task UninstallTemplate(string user, string id, CancellationToken cancellation = default)

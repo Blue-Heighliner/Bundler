@@ -5,7 +5,7 @@ namespace BlueHeighliner.Bundler;
 /// </summary>
 internal enum BundleStanding
 {
-    /// <summary>There is no bundle file for it in the bundles folder.</summary>
+    /// <summary>There is no bundle file for it in the Bundles folder.</summary>
     NotBuilt,
 
     /// <summary>A bundle file is there and it is not installed.</summary>

@@ -7,7 +7,7 @@ internal sealed partial class App : Application
 {
     private ServiceProvider? services;
 
-    /// <summary>Gets the folder with the bundle files, or <see langword="null" /> for <c>bundles</c> next to the executable.</summary>
+    /// <summary>Gets the folder with the bundle files, or <see langword="null" /> for <c>Bundles</c> next to the executable.</summary>
     public string? BundlesDirectory { get; init; }
 
     /// <inheritdoc />

@@ -4,7 +4,7 @@ namespace BlueHeighliner.Bundler;
 /// The latest stable Blender from Blender's own Linux release archive (the Ubuntu archive is a release or two behind), installed
 /// in <c>/opt/blender</c> with a <c>blender</c> command and a menu entry.
 /// </summary>
-internal sealed class ThreeDBundle(IReleaseSources sources, IDownloads downloads, IAptBuilder apt, IAptInstaller aptInstaller, IDecisions decisions, IVersions versions, IProcessRunner runner, ILog log) : BundleBase
+internal sealed class BlenderBundle(IReleaseSources sources, IDownloads downloads, IAptBuilder apt, IAptInstaller aptInstaller, IDecisions decisions, IVersions versions, IProcessRunner runner, ILog log) : BundleBase
 {
     private static readonly string root = "/opt/blender";
 
@@ -15,7 +15,7 @@ internal sealed class ThreeDBundle(IReleaseSources sources, IDownloads downloads
     ];
 
     /// <inheritdoc />
-    public override string Name => "3d";
+    public override string Name => "blender";
 
     /// <inheritdoc />
     public override string Description => "Model, sculpt, texture and animate 3D objects with Blender, and export them for games and apps.";
@@ -57,8 +57,8 @@ internal sealed class ThreeDBundle(IReleaseSources sources, IDownloads downloads
     {
         if (context.State.IsOwned("blender"))
         {
-            File.Delete("/usr/local/bin/blender");
-            File.Delete("/usr/share/applications/blender.desktop");
+            File.DeleteIfPresent("/usr/local/bin/blender");
+            File.DeleteIfPresent("/usr/share/applications/blender.desktop");
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);
@@ -92,7 +92,7 @@ internal sealed class ThreeDBundle(IReleaseSources sources, IDownloads downloads
 
         Directory.Move(Directory.EnumerateDirectories(temporary).First(), destination);
         Directory.Delete(temporary, recursive: true);
-        File.Delete("/usr/local/bin/blender");
+        File.DeleteIfPresent("/usr/local/bin/blender");
         File.CreateSymbolicLink("/usr/local/bin/blender", Path.Combine(destination, "blender"));
         await File.WriteAllTextAsync(
             "/usr/share/applications/blender.desktop",

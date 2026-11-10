@@ -1,7 +1,7 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// Finds the built bundle files in the bundles folder, one file <c>&lt;name&gt;.bundle</c> for each bundle.
+/// Finds the built bundle files in the Bundles folder, one file <c>&lt;name&gt;.bundle</c> for each bundle.
 /// </summary>
 internal interface IBundleFiles
 {

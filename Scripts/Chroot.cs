@@ -6,7 +6,7 @@
 //
 //   dotnet run Scripts/Chroot.cs create                 build the chroot (once, about a minute)
 //   dotnet run Scripts/Chroot.cs sync [BUNDLE...]       copy the published app and the file of each given bundle (hard links when the disks match, otherwise copies, taken from
-//                                                       the repo's bundles/ folder) into the chroot, next to the app in /srv/bundler
+//                                                       the repo's Bundles/ folder) into the chroot, next to the app in /srv/bundler
 //   dotnet run Scripts/Chroot.cs run 'COMMAND'          run a shell command in the chroot as root, in /srv/bundler
 //   dotnet run Scripts/Chroot.cs user 'COMMAND'         the same as the test user "tester"
 //   dotnet run Scripts/Chroot.cs destroy                delete the chroot
@@ -35,10 +35,10 @@ switch (command)
         return 0;
     case "sync":
         string publish = Environment.GetEnvironmentVariable("BUNDLER_TEST_PUBLISH") ?? "/tmp/bundler-publish";
-        string target = $"{root}/srv/bundler/bundles";
-        string source = "bundles";
+        string target = $"{root}/srv/bundler/Bundles";
+        string source = "Bundles";
         (await Script.Run(true, "sudo", "mkdir", "-p", target, $"{root}/srv/bundler")).Verify();
-        (await Script.Run(true, "sudo", "sh", "-c", $"rm -f '{target}'/*.bundle; cp '{publish}/BlueHeighliner.Bundler' '{root}/srv/bundler/Bundler'; chmod 755 '{root}/srv/bundler/Bundler'")).Verify();
+        (await Script.Run(true, "sudo", "sh", "-c", $"rm -f '{target}'/*.bundle; cp '{publish}/Bundler' '{root}/srv/bundler/Bundler'; chmod 755 '{root}/srv/bundler/Bundler'")).Verify();
         foreach (string name in arguments.Skip(1))
         {
             string? newest = Path.Combine(source, $"{name}.bundle") is { } path && File.Exists(path) ? path : null;

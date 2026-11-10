@@ -36,7 +36,7 @@ internal sealed class GodotBundle(
     public override int Order => 70;
 
     /// <inheritdoc />
-    public override IReadOnlyList<string> Requires { get; } = ["dev"];
+    public override IReadOnlyList<string> Requires { get; } = ["dotnet"];
 
     /// <inheritdoc />
     public override async Task<BuildResult> Build(string directory, CancellationToken cancellation = default)
@@ -110,12 +110,12 @@ internal sealed class GodotBundle(
                 string link = Path.Combine(users.Home(user), ".local", "share", "godot", "export_templates", templates);
                 if (templates.Length > 0 && new FileInfo(link).LinkTarget is not null)
                 {
-                    File.Delete(link);
+                    File.DeleteIfPresent(link);
                 }
             }
 
-            File.Delete("/usr/local/bin/godot");
-            File.Delete("/usr/share/applications/godot.desktop");
+            File.DeleteIfPresent("/usr/local/bin/godot");
+            File.DeleteIfPresent("/usr/share/applications/godot.desktop");
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);
@@ -153,7 +153,7 @@ internal sealed class GodotBundle(
         Readable(destination);
         string binary = Directory.EnumerateFiles(destination, "Godot_v*_mono_linux.x86_64").First();
         File.SetUnixFileMode(binary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        File.Delete("/usr/local/bin/godot");
+        File.DeleteIfPresent("/usr/local/bin/godot");
         File.CreateSymbolicLink("/usr/local/bin/godot", binary);
         await File.WriteAllTextAsync(
             "/usr/share/applications/godot.desktop",
@@ -200,7 +200,7 @@ internal sealed class GodotBundle(
         {
             if (new FileInfo(entry).LinkTarget is string target && target.StartsWith(templateRoot + "/", StringComparison.Ordinal))
             {
-                File.Delete(entry);
+                File.DeleteIfPresent(entry);
             }
         }
 

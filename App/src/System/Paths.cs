@@ -1,7 +1,7 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// The folders the app reads and writes. The bundle files are in <c>bundles</c> next to the executable unless told otherwise;
+/// The folders the app reads and writes. The bundle files are in <c>Bundles</c> next to the executable unless told otherwise;
 /// the cache and install records are in root's app data folder, because the app always runs as root.
 /// </summary>
 internal interface IPaths
@@ -41,7 +41,7 @@ internal sealed class Paths(IMachine machine, string? bundles = null) : IPaths
     public string Data { get; } = machine.DataDirectory;
 
     /// <inheritdoc />
-    public string Bundles { get; } = Path.GetFullPath(bundles ?? Path.Combine(machine.ApplicationDirectory, "bundles"));
+    public string Bundles { get; } = Path.GetFullPath(bundles ?? Path.Combine(machine.ApplicationDirectory, "Bundles"));
 
     /// <inheritdoc />
     public string Cache => Path.Combine(Data, "cache");

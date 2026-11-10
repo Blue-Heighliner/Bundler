@@ -33,7 +33,7 @@ internal sealed class NuGetBundleInstaller(INuGetFeed feed, INuGetBundleBuilder 
     {
         if (!feed.Exists)
         {
-            throw new InvalidOperationException("the offline NuGet feed is missing (install the dev bundle first)");
+            throw new InvalidOperationException("the offline NuGet feed is missing (install the dotnet bundle first)");
         }
 
         log.Step("Adding packages to the offline NuGet feed");

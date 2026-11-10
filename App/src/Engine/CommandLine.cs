@@ -25,15 +25,15 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
         => """
             Bundler builds bundles on an online computer and installs them on an offline Ubuntu 26.04 computer.
 
-              BlueHeighliner.Bundler                       open the window
-              BlueHeighliner.Bundler list                  list the bundles
-              BlueHeighliner.Bundler build <bundle|all>    online computer: download the latest stable versions into <bundle>.bundle in the bundles folder
-              BlueHeighliner.Bundler install <bundle>      offline computer: install the bundle file found in the bundles folder
-              BlueHeighliner.Bundler uninstall <bundle>    offline computer: remove what the bundle installed
-              BlueHeighliner.Bundler reinstall <bundle>    offline computer: uninstall the bundle (if installed) and install it again from its file
+              Bundler                       open the window
+              Bundler list                  list the bundles
+              Bundler build <bundle|all>    online computer: download the latest stable versions into <bundle>.bundle in the Bundles folder
+              Bundler install <bundle>      offline computer: install the bundle file found in the Bundles folder
+              Bundler uninstall <bundle>    offline computer: remove what the bundle installed
+              Bundler reinstall <bundle>    offline computer: uninstall the bundle (if installed) and install it again from its file
 
             Options: -y, --yes        do not ask for confirmation
-                     --bundles PATH   use this folder for the bundle files instead of "bundles" next to the app
+                     --bundles PATH   use this folder for the bundle files instead of "Bundles" next to the app
 
             The app always runs as root (it starts itself again through sudo when needed), so what it keeps is in root's app data folder.
             """;

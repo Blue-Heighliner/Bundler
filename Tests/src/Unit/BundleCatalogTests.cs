@@ -29,10 +29,33 @@ public sealed class BundleCatalogTests
         IBundleCatalog catalog = services.GetRequiredService<IBundleCatalog>();
 
         Assert.Equal(catalog.All.Count, catalog.All.Select(bundle => bundle.Name).Distinct().Count());
-        Assert.Equal(12, catalog.All.Count);
+        Assert.Equal(
+            ["git", "a2000", "dotnet", "ollama", "vs-code", "gemma", "open-code", "xunit", "avalonia", "protobuf", "sqlite", "godot", "podman", "gimp", "krita", "blender", "auto-remote"],
+            catalog.All.Select(bundle => bundle.Name));
         Assert.All(catalog.All, bundle => Assert.All(bundle.Requires, required => Assert.Contains(catalog.All, other => other.Name == required)));
         Assert.All(catalog.All, bundle => Assert.NotEmpty(bundle.Description));
         Assert.All(catalog.All, bundle => Assert.Equal("Ubuntu 26.04", bundle.Target));
+    }
+
+    [Theory]
+    [InlineData("dotnet", new string[0])]
+    [InlineData("ollama", new string[0])]
+    [InlineData("open-code", new[] { "git" })]
+    [InlineData("vs-code", new[] { "git", "dotnet", "ollama" })]
+    [InlineData("gemma", new[] { "ollama" })]
+    [InlineData("xunit", new[] { "dotnet" })]
+    [InlineData("godot", new[] { "dotnet" })]
+    [InlineData("gimp", new string[0])]
+    [InlineData("krita", new string[0])]
+    [InlineData("blender", new string[0])]
+    [InlineData("auto-remote", new[] { "git", "dotnet", "ollama", "gemma", "open-code" })]
+    public void RealBundles_NeedExactlyTheBundlesTheyUse(string name, string[] requires)
+    {
+        using ServiceProvider services = new ServiceCollection()
+            .AddBundler(_ => new ObservableLog())
+            .BuildServiceProvider();
+
+        Assert.Equal(requires, services.GetRequiredService<IBundleCatalog>().Get(name).Requires);
     }
 
     [Fact]

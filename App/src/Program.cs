@@ -48,7 +48,7 @@ internal sealed class Program
     /// <summary>
     /// Builds the Avalonia configuration. Also used by the headless tests.
     /// </summary>
-    /// <param name="bundles">The folder with the bundle files, or <see langword="null" /> for <c>bundles</c> next to the executable.</param>
+    /// <param name="bundles">The folder with the bundle files, or <see langword="null" /> for <c>Bundles</c> next to the executable.</param>
     /// <returns>The configured app builder.</returns>
     public static AppBuilder BuildAvaloniaApp(string? bundles = null)
         => AppBuilder.Configure(() => new App { BundlesDirectory = bundles })

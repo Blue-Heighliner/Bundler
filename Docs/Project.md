@@ -7,8 +7,8 @@ Documentation for this repository's own tooling and workflow.
 `Scripts/` holds file-based C# apps (`dotnet run Scripts/<Name>.cs`, from the root) and tasks for automated repository actions. Only what a developer runs by hand is in the folder itself.
 
 - `Scripts/Publish.cs` - cuts a release (see Publishing below). A manual, human-only action.
-- `Scripts/Run.cs` - runs the app locally with `dotnet run`, using the repository's `bundles/` folder (`--bundles`).
-- `Scripts/Chroot.cs` - test harness that installs bundles with the published executable inside a throwaway Ubuntu 26.04 chroot under `/var/tmp` (`create`, `sync`, `run`, `user`, `destroy`; `sync` links (or copies, across disks) the repository's `bundles/` files into `/srv/bundler/bundles` in the chroot, next to the app). Needs `sudo` and `mmdebstrap`; nothing it does as root leaves the chroot folder.
+- `Scripts/Run.cs` - runs the app locally with `dotnet run`, using the repository's `Bundles/` folder (`--bundles`).
+- `Scripts/Chroot.cs` - test harness that installs bundles with the published executable inside a throwaway Ubuntu 26.04 chroot under `/var/tmp` (`create`, `sync`, `run`, `user`, `destroy`; `sync` links (or copies, across disks) the repository's `Bundles/` files into `/srv/bundler/bundles` in the chroot, next to the app). Needs `sudo` and `mmdebstrap`; nothing it does as root leaves the chroot folder.
 
 ## Publishing
 

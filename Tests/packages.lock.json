@@ -416,7 +416,7 @@
           "xunit.v3.runner.common": "[3.2.2]"
         }
       },
-      "BlueHeighliner.Bundler": {
+      "Bundler": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.4, )",

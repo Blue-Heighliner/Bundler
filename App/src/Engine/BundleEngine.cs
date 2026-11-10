@@ -12,7 +12,7 @@ internal interface IBundleEngine
     IReadOnlyList<BundleStatus> List();
 
     /// <summary>
-    /// Builds each bundle into the bundles folder as <c>&lt;name&gt;.bundle</c>, replacing the file that is there. Everything is
+    /// Builds each bundle into the Bundles folder as <c>&lt;name&gt;.bundle</c>, replacing the file that is there. Everything is
     /// downloaded in its latest stable version. A bundle whose file already holds exactly that is left as it is.
     /// </summary>
     /// <param name="names">The bundles; <c>all</c> means every bundle.</param>
@@ -21,7 +21,7 @@ internal interface IBundleEngine
     Task Build(IReadOnlyList<string> names, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Installs each bundle from its file in the bundles folder, after the bundles it needs. Needs administrator rights. A
+    /// Installs each bundle from its file in the Bundles folder, after the bundles it needs. Needs administrator rights. A
     /// bundle that is installed already is skipped: to install a different file of it, reinstall it.
     /// </summary>
     /// <param name="names">The bundles.</param>
@@ -41,7 +41,7 @@ internal interface IBundleEngine
     Task Uninstall(IReadOnlyList<string> names, RunOptions options, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Uninstalls the bundles that are installed and then installs all of them again, from their files in the bundles folder.
+    /// Uninstalls the bundles that are installed and then installs all of them again, from their files in the Bundles folder.
     /// Needs administrator rights. Everything is checked before anything is removed: every file must be there and no other
     /// installed bundle may need one that is removed. Asks once for all.
     /// </summary>
@@ -257,7 +257,7 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
             cancellation);
         Directory.Delete(staging, recursive: true);
         log.Step($"Built {bundle.Name}: {file} ({new FileInfo(file).Length / 1_000_000} MB)");
-        log.Info($"Copy it to the bundles folder next to the app on the offline computer, then install {bundle.Name} there. A computer that has {bundle.Name} installed needs it reinstalled to use the new file.");
+        log.Info($"Copy it to the Bundles folder next to the app on the offline computer, then install {bundle.Name} there. A computer that has {bundle.Name} installed needs it reinstalled to use the new file.");
     }
 
     private async Task InstallOne(IBundle bundle, CancellationToken cancellation)

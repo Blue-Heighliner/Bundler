@@ -109,4 +109,4 @@ jobs:
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ steps.version.outputs.version }}" "publish/win-x64/BlueHeighliner.Bundler.exe" "publish/linux-x64/BlueHeighliner.Bundler" "THIRD-PARTY-NOTICES.txt"
+        run: gh release upload "${{ steps.version.outputs.version }}" "publish/win-x64/Bundler.exe" "publish/linux-x64/Bundler" "THIRD-PARTY-NOTICES.txt"

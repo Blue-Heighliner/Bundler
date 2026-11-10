@@ -8,9 +8,9 @@ One executable. Without arguments it opens the window; with arguments it runs a 
 
 | Command | Where | What it does |
 |---|---|---|
-| `list` | anywhere | One row per bundle: `not built`, `available` (file in the bundles folder) or `installed`, with its target system and when the bundle file was last changed. |
-| `build <bundle...\|all>` | online computer | Downloads the latest stable version of everything the bundle needs and packs it into `<name>.bundle` in the bundles folder, replacing the file there, or does nothing if the file already holds exactly that. |
-| `install <bundle...>` | offline computer | Installs the bundle file found in the bundles folder, after the bundles it needs. A bundle that is installed already is skipped: reinstall it to use a different file. |
+| `list` | anywhere | One row per bundle: `not built`, `available` (file in the Bundles folder) or `installed`, with its target system and when the bundle file was last changed. |
+| `build <bundle...\|all>` | online computer | Downloads the latest stable version of everything the bundle needs and packs it into `<name>.bundle` in the Bundles folder, replacing the file there, or does nothing if the file already holds exactly that. |
+| `install <bundle...>` | offline computer | Installs the bundle file found in the Bundles folder, after the bundles it needs. A bundle that is installed already is skipped: reinstall it to use a different file. |
 | `reinstall <bundle...>` | offline computer | Uninstalls the bundles that are installed and installs all of them again from their files, asking once. Refuses before changing anything if another installed bundle needs one of them. |
 | `uninstall <bundle...>` (`remove`) | offline computer | Removes what the bundle installed. Refuses while another installed bundle needs it. |
 
@@ -20,7 +20,7 @@ On Linux the app always runs as root. If it is started as anyone else it asks fo
 
 ## Bundles folder
 
-The bundles folder is `bundles` next to the executable, or the folder given with `--bundles PATH`. A bundle file is named `<name>.bundle`. Bundles have no revision numbers: a file holds the versions that were latest when it was built. To move a computer to a newer file, reinstall the bundle. See `Docs/Components/Bundles.md`.
+The Bundles folder is `Bundles` next to the executable, or the folder given with `--bundles PATH`. A bundle file is named `<name>.bundle`. Bundles have no revision numbers: a file holds the versions that were latest when it was built. To move a computer to a newer file, reinstall the bundle. See `Docs/Components/Bundles.md`.
 
 ## Where the app keeps its files
 
@@ -31,4 +31,4 @@ The app reads no environment variables as settings. Because it always runs as ro
 | `cache/` | Build cache: downloads, the private .NET SDK used to mirror NuGet packages, apt state. |
 | `state/` | What is installed, per bundle. |
 
-The bundle files are in `bundles` next to the executable, or in the folder given with `--bundles`; they are the only thing a person moves around. Fixed places elsewhere: `/var/tmp` for the scratch space of NuGet mirroring (about 2 GB while a bundle is built) and for unpacking a bundle while it installs, and `/opt/bundler/nuget-feed` for the offline NuGet feed.
+The bundle files are in `Bundles` next to the executable, or in the folder given with `--bundles`; they are the only thing a person moves around. Fixed places elsewhere: `/var/tmp` for the scratch space of NuGet mirroring (about 2 GB while a bundle is built) and for unpacking a bundle while it installs, and `/opt/bundler/nuget-feed` for the offline NuGet feed.

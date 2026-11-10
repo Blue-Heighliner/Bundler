@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RootNamespace>BlueHeighliner.Bundler</RootNamespace>
-    <AssemblyName>BlueHeighliner.Bundler</AssemblyName>
+    <AssemblyName>Bundler</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PublishDocumentationFile>false</PublishDocumentationFile>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>

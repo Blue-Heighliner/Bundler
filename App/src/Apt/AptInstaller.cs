@@ -58,7 +58,7 @@ internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex inde
         List<string> todo = [];
         foreach (string package in Names(directory, "top-level.txt"))
         {
-            string bundleVersion = available.FirstOrDefault(entry => entry.Package == package)?.Version ?? string.Empty;
+            string bundleVersion = available.Where(entry => entry.Package == package).Select(entry => entry.Version).OrderBy(version => version, Comparer<string>.Create(versions.CompareDebian)).LastOrDefault() ?? string.Empty;
             string? installed = await InstalledVersion(package, cancellation);
             if (installed is null || versions.CompareDebian(bundleVersion, installed) > 0)
             {
@@ -172,24 +172,81 @@ internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex inde
         {
             Directory.CreateSymbolicLink(Path.Combine(work, "repo"), Path.GetFullPath(directory));
             await File.WriteAllTextAsync(Path.Combine(work, "sources.list"), $"deb [trusted=yes] file:{work}/repo ./\n", cancellation);
-            string[] options =
-            [
-                "-o", $"Dir::Etc::sourcelist={work}/sources.list", "-o", $"Dir::Etc::sourceparts={work}/none", "-o", $"Dir::State::lists={work}/lists",
-                "-o", $"Dir::Cache::archives={work}/archives", "-o", "Dir::Cache::pkgcache=", "-o", "Dir::Cache::srcpkgcache=",
-                "-o", "APT::Sandbox::User=root", "-o", $"Dir::Etc::preferences={work}/none/prefs", "-o", $"Dir::Etc::preferencesparts={work}/none",
-            ];
+            string[] Options(string preferences)
+                =>
+                [
+                    "-o", $"Dir::Etc::sourcelist={work}/sources.list", "-o", $"Dir::Etc::sourceparts={work}/none", "-o", $"Dir::State::lists={work}/lists",
+                    "-o", $"Dir::Cache::archives={work}/archives", "-o", "Dir::Cache::pkgcache=", "-o", "Dir::Cache::srcpkgcache=",
+                    "-o", "APT::Sandbox::User=root", "-o", $"Dir::Etc::preferences={preferences}", "-o", $"Dir::Etc::preferencesparts={work}/none",
+                ];
 
+            string[] options = Options($"{work}/none/prefs");
             HashSet<string> before = await InstalledNames(cancellation);
             await runner.Run(new() { FileName = "apt-get", Arguments = [.. options, "-qq", "update"], Environment = noninteractive, StreamOutput = true }, cancellation);
-            await runner.Run(
-                new() { FileName = "apt-get", Arguments = [.. options, "install", "-y", "--no-install-recommends", "-o", "Dpkg::Options::=--force-confold", .. packages], Environment = noninteractive, StreamOutput = true },
-                cancellation);
+            string[] install = ["install", "-y", "--no-remove", "--no-install-recommends", "-o", "Dpkg::Options::=--force-confold", .. packages];
+            if (!(await runner.Run(new() { FileName = "apt-get", Arguments = [.. options, "-s", .. install], Environment = noninteractive, Check = false }, cancellation)).Success
+                && await PreferInstalledVersions(directory, $"{work}/prefs", cancellation))
+            {
+                string[] matching = Options($"{work}/prefs");
+                if ((await runner.Run(new() { FileName = "apt-get", Arguments = [.. matching, "-s", .. install], Environment = noninteractive, Check = false }, cancellation)).Success)
+                {
+                    log.Info("the newest library versions do not fit the packages on this computer, using the versions that match them where the bundle has those");
+                    options = matching;
+                }
+            }
+
+            await runner.Run(new() { FileName = "apt-get", Arguments = [.. options, .. install], Environment = noninteractive, StreamOutput = true }, cancellation);
             return (await InstalledNames(cancellation)).Except(before).Order(StringComparer.Ordinal).ToList();
         }
         finally
         {
             Directory.Delete(work, recursive: true);
         }
+    }
+
+    private async Task<bool> PreferInstalledVersions(string directory, string file, CancellationToken cancellation)
+    {
+        Dictionary<string, HashSet<string>> installed = [];
+        foreach (string line in (await runner.Run(new() { FileName = "dpkg-query", Arguments = ["-W", "-f", "${source:Package}\t${Version}\n"], Check = false }, cancellation)).Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] fields = line.Split('\t');
+            if (fields.Length == 2)
+            {
+                installed.TryAdd(fields[0], []);
+                installed[fields[0]].Add(fields[1]);
+            }
+        }
+
+        Dictionary<string, (string Source, List<string> Versions)> repository = [];
+        foreach (string stanza in File.ReadAllText(Path.Combine(directory, "Packages")).Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
+        {
+            string name = index.Field(stanza, "Package");
+            string version = index.Field(stanza, "Version");
+            string source = index.Field(stanza, "Source").Split(' ')[0];
+            if (name.Length > 0 && version.Length > 0)
+            {
+                repository.TryAdd(name, (source.Length > 0 ? source : name, []));
+                repository[name].Versions.Add(version);
+            }
+        }
+
+        List<string> stanzas = [];
+        foreach ((string name, (string source, List<string> offered)) in repository.Where(item => item.Value.Versions.Count > 1))
+        {
+            string? match = installed.TryGetValue(source, out HashSet<string>? have) ? offered.FirstOrDefault(have.Contains) : null;
+            if (match is not null)
+            {
+                stanzas.Add($"Package: {name}\nPin: version {match}\nPin-Priority: 999\n");
+            }
+        }
+
+        if (stanzas.Count == 0)
+        {
+            return false;
+        }
+
+        await File.WriteAllTextAsync(file, string.Join('\n', stanzas), cancellation);
+        return true;
     }
 
     private async Task<HashSet<string>> InstalledNames(CancellationToken cancellation)

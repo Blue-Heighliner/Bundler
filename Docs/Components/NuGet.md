@@ -8,7 +8,7 @@ Covers `NuGetMirror`, `NuGetBundleBuilder`, `NuGetBundleInstaller`, `NuGetFeed`,
 
 ## Feed on the offline computer
 
-`/opt/bundler/nuget-feed` is shared by all NuGet bundles. Installing adds only the versions the feed does not have; older versions stay, and only versions the bundle itself added are removed on uninstall. A version two bundles both ship is recorded by the second one as shared; when the first is uninstalled the version is handed over to the second, so it stays until that one goes too. The `dev` bundle writes machine-wide and per-user `NuGet.Config` files that list only this feed.
+`/opt/bundler/nuget-feed` is shared by all NuGet bundles. Installing adds only the versions the feed does not have; older versions stay, and only versions the bundle itself added are removed on uninstall. A version two bundles both ship is recorded by the second one as shared; when the first is uninstalled the version is handed over to the second, so it stays until that one goes too. The `dotnet` bundle writes machine-wide and per-user `NuGet.Config` files that list only this feed.
 
 ## Templates
 

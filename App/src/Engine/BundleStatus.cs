@@ -20,6 +20,6 @@ internal sealed record BundleStatus
     /// <summary>Gets where the bundle stands.</summary>
     public required BundleStanding State { get; init; }
 
-    /// <summary>Gets when the bundle file in the bundles folder was last changed (local time), or <see langword="null" /> when there is none.</summary>
+    /// <summary>Gets when the bundle file in the Bundles folder was last changed (local time), or <see langword="null" /> when there is none.</summary>
     public DateTime? FileModified { get; init; }
 }
