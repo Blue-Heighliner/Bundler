@@ -28,7 +28,7 @@ The app reads no environment variables as settings. Because it always runs as ro
 
 | Folder | Content |
 |---|---|
-| `cache/` | Build cache: downloads, the private .NET SDK used to mirror NuGet packages, apt state. |
+| `cache/` | Build cache: downloads, the private .NET SDKs used to mirror NuGet packages, apt state. |
 | `state/` | What is installed, per bundle. |
 
 The bundle files are in `Bundles` next to the executable, or in the folder given with `--bundles`; they are the only thing a person moves around. Fixed places elsewhere: `/var/tmp` for the scratch space of NuGet mirroring (about 2 GB while a bundle is built) and for unpacking a bundle while it installs, and `/opt/bundler/nuget-feed` for the offline NuGet feed.

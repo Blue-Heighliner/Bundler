@@ -1,13 +1,13 @@
 # SQLite for .NET: ADO.NET providers, Entity Framework Core, the native SQLite builds, and common wrappers.
-# "Id@10.*" is the latest stable 10.x version (packages that follow the .NET release the feed is built for). A leading ? means optional (skipped with a warning when it has no stable release); a leading = means only that package.
+# "Id@dotnet" is the latest stable version that goes with each .NET release the feed is built for (10.x for net10.0, 11.x for net11.0), for packages that follow the .NET release. A leading ? means optional (skipped with a warning when it has no stable release); a leading = means only that package.
 
 # Microsoft.Data.Sqlite and EF Core
-Microsoft.Data.Sqlite@10.*
-Microsoft.Data.Sqlite.Core@10.*
-Microsoft.EntityFrameworkCore.Sqlite@10.*
-Microsoft.EntityFrameworkCore.Sqlite.Core@10.*
-Microsoft.EntityFrameworkCore.Design@10.*
-=dotnet-ef@10.*
+Microsoft.Data.Sqlite@dotnet
+Microsoft.Data.Sqlite.Core@dotnet
+Microsoft.EntityFrameworkCore.Sqlite@dotnet
+Microsoft.EntityFrameworkCore.Sqlite.Core@dotnet
+Microsoft.EntityFrameworkCore.Design@dotnet
+=dotnet-ef@dotnet
 
 # SQLitePCLRaw: the native SQLite builds the providers load
 SQLitePCLRaw.bundle_e_sqlite3

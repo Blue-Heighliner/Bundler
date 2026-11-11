@@ -22,7 +22,7 @@ Packages are resolved against the Ubuntu 24.04 archive in a private apt root in 
 
 ## NuGet mirrored with a real restore
 
-A hand-written dependency walker would drift from NuGet's resolution rules. The build instead runs a real `dotnet restore` with a private latest-stable SDK against a scratch project and collects what the global packages folder ends up holding, including runtime packs, then lays it out as a v3 feed. Template packs stay in the bundle, not the feed, because `dotnet new` installs them from files.
+A hand-written dependency walker would drift from NuGet's resolution rules. The build instead runs a real `dotnet restore`, once with a private SDK of each supported channel (10.0 and 11.0) against a scratch project for that SDK's own target framework, and collects what the global packages folder ends up holding, including runtime packs, then lays it out as a v3 feed. Template packs stay in the bundle, not the feed, because `dotnet new` installs them from files.
 
 ## Installs only undo what they did
 

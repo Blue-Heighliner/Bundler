@@ -1,8 +1,9 @@
 namespace BlueHeighliner.Bundler;
 
 /// <summary>
-/// Mirrors NuGet packages with a real <c>dotnet restore</c> of the latest SDK, so a feed holds exactly what a restore on the
-/// target asks for, including transitive dependencies and the runtime packs. Works in an isolated scratch area (its own
+/// Mirrors NuGet packages with a real <c>dotnet restore</c> of each supported SDK for its own target framework, so a feed holds
+/// exactly what a restore on the target asks for, whichever SDK and framework a project uses, including transitive dependencies and
+/// the runtime packs. Works in an isolated scratch area (its own
 /// package folder, nuget.org as the only source) outside any git repository, because some templates write files such as
 /// <c>global.json</c> into the root of the repository they run in.
 /// </summary>
@@ -16,13 +17,14 @@ internal interface INuGetMirror
     Task Begin(CancellationToken cancellation = default);
 
     /// <summary>
-    /// Restores packages (and everything they depend on) for the SDK's own target framework and the runtime packs of
-    /// linux-x64 and win-x64, so all of it lands in the scratch package folder.
+    /// Restores packages (and everything they depend on) with an SDK for its own target framework and the runtime packs of
+    /// linux-x64 and win-x64, so all of it lands in the scratch package folder next to what earlier restores brought.
     /// </summary>
-    /// <param name="packages">The packages, each at its wanted version or the latest stable one.</param>
+    /// <param name="release">The SDK to restore with; its channel is the target framework.</param>
+    /// <param name="packages">The packages, each at its wanted version (a range such as <c>10.*</c> floats within it) or the latest stable one.</param>
     /// <param name="cancellation">Stops the work when cancelled.</param>
     /// <returns>A task that completes when the restore is done.</returns>
-    Task Restore(IReadOnlyList<NuGetPackage> packages, CancellationToken cancellation = default);
+    Task Restore(DotNetRelease release, IReadOnlyList<NuGetPackage> packages, CancellationToken cancellation = default);
 
     /// <summary>
     /// Downloads one package without its dependencies into the scratch package folder.
@@ -34,7 +36,7 @@ internal interface INuGetMirror
     Task FetchExact(string id, string version, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Installs a template pack into the scratch area's own template store.
+    /// Installs a template pack into the scratch area's own template store, which every SDK shares.
     /// </summary>
     /// <param name="nupkg">The template pack file.</param>
     /// <param name="cancellation">Stops the work when cancelled.</param>
@@ -43,12 +45,13 @@ internal interface INuGetMirror
 
     /// <summary>
     /// Creates a project from each template and restores it, which pulls in the packages the templates reference at the
-    /// versions the SDK knows.
+    /// versions the SDK knows, for the target framework of the SDK.
     /// </summary>
+    /// <param name="release">The SDK to create and restore the projects with; its channel is the target framework.</param>
     /// <param name="templates">The template short names; one that does not exist is skipped with a warning.</param>
     /// <param name="cancellation">Stops the work when cancelled.</param>
     /// <returns>A task that completes when all are restored.</returns>
-    Task RestoreTemplates(IReadOnlyList<string> templates, CancellationToken cancellation = default);
+    Task RestoreTemplates(DotNetRelease release, IReadOnlyList<string> templates, CancellationToken cancellation = default);
 
     /// <summary>
     /// Copies every package of the scratch package folder into a folder as a v3 feed.
@@ -86,16 +89,15 @@ internal sealed class NuGetMirror(IPaths paths, IMachine machine, IDotNetSdks sd
     }
 
     /// <inheritdoc />
-    public async Task Restore(IReadOnlyList<NuGetPackage> packages, CancellationToken cancellation = default)
+    public async Task Restore(DotNetRelease release, IReadOnlyList<NuGetPackage> packages, CancellationToken cancellation = default)
     {
-        DotNetRelease release = await sdks.Latest(cancellation);
         string references = string.Concat(packages.Select(package => $"    <PackageReference Include=\"{package.Id}\" Version=\"{package.Version ?? "*"}\" />\n"));
         string project = Path.Combine(Work, "proj", "Mirror.csproj");
         await File.WriteAllTextAsync(
             project,
             $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net{release.Channel}</TargetFramework>\n    <RuntimeIdentifiers>{string.Join(';', runtimes)}</RuntimeIdentifiers>\n    <SelfContained>true</SelfContained>\n    <NuGetAudit>false</NuGetAudit>\n    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>\n  </PropertyGroup>\n  <ItemGroup>\n{references}  </ItemGroup>\n</Project>\n",
             cancellation);
-        await Dotnet(["restore", project, "--configfile", Config, "--force", "-v", "q"], check: true, cancellation);
+        await Dotnet(release, ["restore", project, "--configfile", Config, "--force", "-v", "q"], check: true, cancellation);
     }
 
     /// <inheritdoc />
@@ -109,15 +111,15 @@ internal sealed class NuGetMirror(IPaths paths, IMachine machine, IDotNetSdks sd
     }
 
     /// <inheritdoc />
-    public Task InstallTemplate(string nupkg, CancellationToken cancellation = default)
-        => Dotnet(["new", "install", nupkg], check: true, cancellation);
+    public async Task InstallTemplate(string nupkg, CancellationToken cancellation = default)
+        => await Dotnet((await sdks.Releases(cancellation))[^1], ["new", "install", nupkg], check: true, cancellation);
 
     /// <inheritdoc />
-    public async Task RestoreTemplates(IReadOnlyList<string> templates, CancellationToken cancellation = default)
+    public async Task RestoreTemplates(DotNetRelease release, IReadOnlyList<string> templates, CancellationToken cancellation = default)
     {
         foreach (string template in templates)
         {
-            log.Info($"template {template}");
+            log.Info($"template {template} for net{release.Channel}");
             string folder = Path.Combine(Work, "tpl");
             if (Directory.Exists(folder))
             {
@@ -125,13 +127,14 @@ internal sealed class NuGetMirror(IPaths paths, IMachine machine, IDotNetSdks sd
             }
 
             Directory.CreateDirectory(folder);
-            if (!(await Dotnet(["new", template, "-o", folder, "--no-restore"], check: false, cancellation)).Success)
+            string[] create = ["new", template, "-o", folder, "--no-restore"];
+            if (!(await Dotnet(release, [.. create, "-f", $"net{release.Channel}"], check: false, cancellation)).Success && !(await Dotnet(release, create, check: false, cancellation)).Success)
             {
                 log.Warn($"template {template} is not available, skipped");
                 continue;
             }
 
-            if (!(await Dotnet(["restore", folder, "--configfile", Config, "-v", "q"], check: false, cancellation)).Success)
+            if (!(await Dotnet(release, ["restore", folder, "--configfile", Config, "-v", "q"], check: false, cancellation)).Success)
             {
                 log.Warn($"restore of template {template} failed");
             }
@@ -164,8 +167,9 @@ internal sealed class NuGetMirror(IPaths paths, IMachine machine, IDotNetSdks sd
         }
     }
 
-    private Task<ProcessResult> Dotnet(IReadOnlyList<string> arguments, bool check, CancellationToken cancellation)
+    private Task<ProcessResult> Dotnet(DotNetRelease release, IReadOnlyList<string> arguments, bool check, CancellationToken cancellation)
         => sdks.Run(
+            release,
             arguments,
             Path.Combine(Work, "run"),
             new Dictionary<string, string?> { ["NUGET_PACKAGES"] = Path.Combine(Work, "packages"), ["DOTNET_CLI_HOME"] = Path.Combine(Work, "home"), ["NUGET_HTTP_CACHE_PATH"] = Path.Combine(Work, "http") },

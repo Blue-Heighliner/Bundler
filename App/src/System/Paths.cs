@@ -12,7 +12,7 @@ internal interface IPaths
     /// <summary>Gets the folder with the built bundle files.</summary>
     string Bundles { get; }
 
-    /// <summary>Gets the build cache: downloads, the .NET SDK used to mirror NuGet packages, apt state.</summary>
+    /// <summary>Gets the build cache: downloads, the .NET SDKs used to mirror NuGet packages, apt state.</summary>
     string Cache { get; }
 
     /// <summary>Gets the folder downloads are kept in between builds.</summary>

@@ -35,4 +35,8 @@ public sealed class NuGetPackageListTests
         Assert.Equal("10.*", packages[1].Version);
         Assert.True(packages[1].Alone);
     }
+
+    [Fact]
+    public void Parse_DotNetToken_IsKeptAsTheVersion()
+        => Assert.Equal("dotnet", new NuGetPackageList().Parse("Microsoft.Extensions.Hosting@dotnet")[0].Version);
 }

@@ -10,7 +10,7 @@ How installs treat what is already on the computer: a missing component is insta
 |---|---|---|
 | [`git`](#git) | none | git |
 | [`a2000`](#a2000) | none | NVIDIA driver for the RTX A2000 |
-| [`dotnet`](#dotnet) | none | .NET SDK, offline NuGet feed |
+| [`dotnet`](#dotnet) | none | .NET 10 and 11 SDKs, offline NuGet feed |
 | [`ollama`](#ollama) | none | Ollama local model server as a systemd service |
 | [`vs-code`](#vs-code) | `git`, `dotnet`, `ollama` | VS Code with C#, Git Graph, .NET Install Tool and Cline |
 | [`gemma`](#gemma) | `ollama` | Gemma 4 26B-A4B model for Ollama and Cline |
@@ -53,12 +53,13 @@ The install reports the NVIDIA GPU it finds and warns if there is none or if it 
 
 ## dotnet
 
-The .NET SDK and the offline NuGet feed, set up so that C# builds without internet: NuGet restore uses only the offline feed (machine-wide and for every user), and .NET telemetry is off. The SDK is the newest of the 10.0 channel (the long term support release, supported until 2028) on purpose, not the newest channel: the feed, the `dotnet new` templates and the other NuGet bundles are made for net10.0, and an SDK 11 cannot build net10.0 projects offline. Packages that follow the .NET release (`Microsoft.Extensions.*`, the runtime packs, EF Core and so on) are taken at their newest 10.x version for the same reason.
+The .NET 10 and .NET 11 SDKs side by side in `/usr/share/dotnet`, and the offline NuGet feed, set up so that C# builds without internet whichever SDK and target framework a project uses: NuGet restore uses only the offline feed (machine-wide and for every user), and .NET telemetry is off. `dotnet` runs the newest SDK (11); a `global.json` picks the 10 one. Both SDKs build net10.0 and net11.0 projects offline: the runtimes and targeting packs of both are in the same folder, and the feed holds the packages of a restore for net10.0 with the 10 SDK and of one for net11.0 with the 11 SDK, so packages that follow the .NET release (`Microsoft.Extensions.*`, the runtime packs, EF Core and so on) are there in their 10.x and their 11.x versions. A build takes the newest SDK of each of the two channels (10.0 is the long term support release, supported until 2028); other channels are not brought. The install adds what is missing next to what is already in the folder (an older patch version of a channel stays beside the new one, and the muxer is replaced only by one from a newer host), and an uninstall removes only what the install added.
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| .NET SDK | 10.0.404 | Builds and runs C# projects. Includes runtime 10.0.15 and ASP.NET Core. | MIT | Free use. |
-| Offline NuGet feed | net10.0 | Basic .NET packages with their dependencies in `/opt/bundler/nuget-feed`: Microsoft.Extensions.*, System.CommandLine, System.IO.Ports, System.Reactive, System.Linq.Async, System.Drawing.Common, System.Text.Json, Microsoft.NET.Test.Sdk, the runtime, apphost and ILLink packs for linux-x64 and win-x64, and what the `dotnet new` console, classlib, worker, webapi, web, mvc, razor, blazor and grpc templates reference (list in `App/src/Resources/dotnet/packages.txt`). | MIT, Apache-2.0, BSD-3-Clause | Free use. |
+| .NET 10 SDK | 10.0.404 | Builds and runs C# projects for net10.0. Includes runtime 10.0.15 and ASP.NET Core. | MIT | Free use. |
+| .NET 11 SDK | 11.0.100 | Builds and runs C# projects for net11.0 and net10.0. Includes runtime 11.0.0 and ASP.NET Core. | MIT | Free use. |
+| Offline NuGet feed | net10.0, net11.0 | Basic .NET packages with their dependencies in `/opt/bundler/nuget-feed`: Microsoft.Extensions.*, System.CommandLine, System.IO.Ports, System.Reactive, System.Linq.Async, System.Drawing.Common, System.Text.Json, Microsoft.NET.Test.Sdk, the runtime, apphost and ILLink packs for linux-x64 and win-x64, and what the `dotnet new` console, classlib, worker, webapi, web, mvc, razor, blazor and grpc templates reference (list in `App/src/Resources/dotnet/packages.txt`). | MIT, Apache-2.0, BSD-3-Clause | Free use. |
 | Support libraries | - | What .NET needs to run (ICU, OpenSSL, tzdata, ca-certificates, ...); installed only when missing. | GPL-2.0, LGPL-2.1, MIT, BSD-3-Clause | Free use. |
 
 ## ollama
@@ -102,14 +103,14 @@ OpenCode, the AI coding agent for the command line, which runs the models of the
 
 ## xunit
 
-xunit v3 only (no xunit 2.x), with Moq and coverlet.collector. Create projects with `dotnet new xunit3 -f net10.0` (the template defaults to net8.0, and only the .NET 10 runtime is installed).
+xunit v3 only (no xunit 2.x), with Moq and coverlet.collector. Create projects with `dotnet new xunit3 -f net10.0` (the template defaults to net8.0 and offers frameworks up to net10.0; for net11.0 change `TargetFramework` in the project afterwards, which builds offline).
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| xunit v3 | 4.0.2 | Test framework (xunit.v3, .core, .assert, .common, .extensibility.core, .runner.*, .mtp-*) and the `xunit3` templates. | Apache-2.0 | Free use. |
+| xunit v3 | 4.0.3 | Test framework (xunit.v3, .core, .assert, .common, .extensibility.core, .runner.*, .mtp-*) and the `xunit3` templates. | Apache-2.0 | Free use. |
 | xunit.runner.visualstudio | 4.0.1 | VSTest adapter used by xunit v3 projects, with xunit.analyzers. | Apache-2.0 | Free use. |
 | xunit.abstractions | 2.0.3 | Interfaces that xunit.v3.runner.utility depends on. | Apache-2.0 | Free use. |
-| Microsoft.NET.Test.Sdk | 18.11.0 | Test host. | MIT | Free use. |
+| Microsoft.NET.Test.Sdk | 18.11.1 | Test host. | MIT | Free use. |
 | coverlet.collector | 10.1.0 | Code coverage collector. | MIT | Free use. |
 | Moq | 4.21.0 | Mocking library. | BSD-3-Clause | Free use. |
 
@@ -121,8 +122,8 @@ The stock templates make every project reference `AvaloniaUI.DiagnosticsSupport`
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Avalonia | 12.1.4 | Cross-platform UI framework: Avalonia, .Desktop, .Themes.Fluent, .Themes.Simple, .Fonts.Inter, .Controls.DataGrid, .Controls.ColorPicker, .Skia, .X11, .Win32, .Native, .FreeDesktop, .Markup.Xaml.Loader, .Remote.Protocol, .Headless, .Headless.XUnit. | MIT | Free use. |
-| Avalonia.Templates | 12.1.4 | `dotnet new` templates, modified as described above. | MIT | Free use. |
+| Avalonia | 12.1.6 | Cross-platform UI framework: Avalonia, .Desktop, .Themes.Fluent, .Themes.Simple, .Fonts.Inter, .Controls.DataGrid, .Controls.ColorPicker, .Skia, .X11, .Win32, .Native, .FreeDesktop, .Markup.Xaml.Loader, .Remote.Protocol, .Headless, .Headless.XUnit. | MIT | Free use. |
+| Avalonia.Templates | 12.1.6 | `dotnet new` templates, modified as described above. | MIT | Free use. |
 | Avalonia.Angle.Windows.Natives | - | ANGLE graphics library for Windows. | BSD-3-Clause | Free use. |
 | CommunityToolkit.Mvvm | 8.4.2 | MVVM helpers. | MIT | Free use. |
 | Tmds.DBus.Protocol | 0.95.2 | D-Bus protocol library. | MIT | Free use. |
@@ -140,7 +141,7 @@ Install the EF tool with `dotnet tool install --global dotnet-ef`; it comes from
 
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
-| Microsoft.Data.Sqlite and EF Core SQLite | 10.0.15 | ADO.NET provider, EF Core provider (Microsoft.EntityFrameworkCore.Sqlite and .Design) and the EF tool package dotnet-ef. | MIT | Free use. |
+| Microsoft.Data.Sqlite and EF Core SQLite | 10.0.15, 11.0.0 | ADO.NET provider, EF Core provider (Microsoft.EntityFrameworkCore.Sqlite and .Design) and the EF tool package dotnet-ef. | MIT | Free use. |
 | SQLitePCLRaw | 3.0.5 | Native SQLite for the .NET providers: the wrappers and the native SQLite builds. | MIT, Public-Domain | Free use. |
 | System.Data.SQLite | 2.0.4 | Another SQLite provider, with System.Data.SQLite.Core 1.0.119. | Public-Domain | Free use. |
 | sqlite-net-pcl | 1.11.285 | SQLite wrapper. | MIT | Free use. |
@@ -218,7 +219,7 @@ Where a license text or a metadata field was read for a service, and where it wa
 |---|---|---|
 | git | git | Debian copyright file (GPL-2.0, with LGPL-2.1+, Expat and ISC parts) |
 | a2000 | NVIDIA driver | `licenses/NVIDIA-Driver-License.txt`; the 615 package carries the same license text (compared with the one read for the 595 package: nothing in the text on file is missing from it) |
-| dotnet | .NET SDK | `LICENSE.txt` in the tarball |
+| dotnet | .NET 10 and 11 SDKs | `LICENSE.txt` in the tarball |
 | vs-code | Visual Studio Code | `licenses/VSCode-License.rtf` |
 | vs-code | C# extension | `licenses/CSharp-Extension-License.txt` |
 | vs-code | .NET Install Tool | license text |

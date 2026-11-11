@@ -34,21 +34,29 @@ internal sealed class NuGetBundleBuilder(
     IHttpFetcher http,
     ITemplatePatcher patcher,
     INuGetLicenses licenses,
-    INuGetFeed feed,
     IDotNetSdks sdks,
     ILog log) : INuGetBundleBuilder
 {
     /// <inheritdoc />
     public async Task<NuGetBuildResult> Build(NuGetBundleSpec spec, string directory, CancellationToken cancellation = default)
     {
-        await sdks.Latest(cancellation);
+        IReadOnlyList<DotNetRelease> releases = await sdks.Releases(cancellation);
         log.Step("Looking up the packages");
-        Dictionary<string, string> latest = [];
+        Dictionary<(string Channel, string Id), string> versions = [];
         List<NuGetPackage> wanted = [];
         foreach (NuGetPackage package in list.Parse(resources.Text(spec.PackageList)))
         {
-            string? version = await sources.LatestNuGet(package.Id, package.Version is string range && range.Contains('*') ? range : null, cancellation);
-            if (version is null)
+            Dictionary<string, string> found = [];
+            foreach (DotNetRelease release in releases)
+            {
+                string? version = package.Version is string pinned && Range(package, release) is null ? pinned : await sources.LatestNuGet(package.Id, Range(package, release), cancellation);
+                if (version is not null)
+                {
+                    found[release.Channel] = version;
+                }
+            }
+
+            if (found.Count == 0)
             {
                 if (package.Optional)
                 {
@@ -59,26 +67,37 @@ internal sealed class NuGetBundleBuilder(
                 throw new InvalidOperationException($"package {package.Id} has no stable release on nuget.org (check {spec.PackageList})");
             }
 
-            latest[package.Id] = version;
+            foreach ((string channel, string version) in found)
+            {
+                versions[(channel, package.Id)] = version;
+            }
+
             wanted.Add(package);
         }
 
         await mirror.Begin(cancellation);
         try
         {
-            List<NuGetPackage> restore = wanted.Where(package => !package.Alone && !list.IsPlatformPack(package.Id)).ToList();
-            log.Step($"Downloading {restore.Count} packages and everything they depend on");
-            await mirror.Restore(restore, cancellation);
-            foreach (NuGetPackage package in wanted)
+            foreach (DotNetRelease release in releases)
             {
-                await mirror.FetchExact(package.Id, package.Version is string exact && !exact.Contains('*') ? exact : latest[package.Id], cancellation);
+                List<NuGetPackage> present = wanted.Where(package => versions.ContainsKey((release.Channel, package.Id))).ToList();
+                List<NuGetPackage> restore = present.Where(package => !package.Alone && !list.IsPlatformPack(package.Id)).Select(package => package with { Version = Range(package, release) ?? package.Version }).ToList();
+                log.Step($"Downloading {restore.Count} packages and everything they depend on, for net{release.Channel}");
+                await mirror.Restore(release, restore, cancellation);
+                foreach (NuGetPackage package in present)
+                {
+                    await mirror.FetchExact(package.Id, versions[(release.Channel, package.Id)], cancellation);
+                }
             }
 
             await BuildTemplates(spec, directory, cancellation);
             if (spec.WarmTemplates.Count > 0)
             {
-                log.Step("Downloading the packages the templates use");
-                await mirror.RestoreTemplates(spec.WarmTemplates, cancellation);
+                foreach (DotNetRelease release in releases)
+                {
+                    log.Step($"Downloading the packages the templates use, for net{release.Channel}");
+                    await mirror.RestoreTemplates(release, spec.WarmTemplates, cancellation);
+                }
             }
 
             await mirror.Collect(Path.Combine(directory, "nuget"));
@@ -100,7 +119,7 @@ internal sealed class NuGetBundleBuilder(
         }
 
         string feedFolder = Path.Combine(directory, "nuget");
-        List<string> components = wanted.Select(package => $"NuGet {package.Id} {feed.HighestVersion(feedFolder, package.Id)}").ToList();
+        List<string> components = wanted.Select(package => $"NuGet {package.Id} {string.Join(", ", releases.Where(release => versions.ContainsKey((release.Channel, package.Id))).Select(release => versions[(release.Channel, package.Id)]).Distinct())}").ToList();
         components.AddRange(spec.TemplatePackages.Select(id => $"dotnet template pack {id} {TemplateVersion(Path.Combine(directory, "templates"), id)}"));
         components.Add($"{Directory.EnumerateFiles(feedFolder, "*.nupkg", SearchOption.AllDirectories).Count()} packages in total, with dependencies");
         return new() { Components = components };
@@ -137,4 +156,7 @@ internal sealed class NuGetBundleBuilder(
             await mirror.InstallTemplate(file, cancellation);
         }
     }
+
+    private string? Range(NuGetPackage package, DotNetRelease release)
+        => package.Version == "dotnet" ? $"{release.Channel.Split('.')[0]}.*" : package.Version is string version && version.Contains('*') ? version : null;
 }

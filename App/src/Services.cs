@@ -58,6 +58,7 @@ internal static class ServiceCollectionExtensions
             services.AddSingleton<IBundle, GemmaBundle>();
             services.AddSingleton<IBundle, OpenCodeBundle>();
             services.AddSingleton<IOpenCodeFiles, OpenCodeFiles>();
+            services.AddSingleton<IDotNetFiles, DotNetFiles>();
             services.AddSingleton<IBundle, XunitBundle>();
             services.AddSingleton<IBundle, AvaloniaBundle>();
             services.AddSingleton<IBundle, ProtobufBundle>();
