@@ -15,6 +15,7 @@ public sealed class BundleEngineTests : IDisposable
     private readonly Mock<IBundle> dev = new();
     private readonly Mock<IBundleState> gitState = new();
     private readonly Mock<IBundleState> devState = new();
+    private readonly List<(string Name, long? Limit, byte[] Bytes)> written = [];
     private readonly BundleEngine engine;
 
     public BundleEngineTests()
@@ -44,33 +45,50 @@ public sealed class BundleEngineTests : IDisposable
         machine.SetupGet(m => m.IsLinux).Returns(true);
         machine.SetupGet(m => m.IsPrivileged).Returns(true);
         users.Setup(u => u.Normal()).Returns(["alice"]);
-        engine = new(catalog.Object, files.Object, archive.Object, states.Object, users.Object, paths.Object, machine.Object, log.Object);
+        engine = new(catalog.Object, files.Object, archive.Object, states.Object, users.Object, paths.Object, machine.Object, new ByteSizes(), log.Object);
     }
 
     public void Dispose()
         => directory.Dispose();
 
-    private void SetupPack()
-        => archive.Setup(a => a.Pack(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<BundleInfo>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, BundleInfo, IReadOnlyDictionary<string, string>, CancellationToken>((_, file, _, _, _) => File.WriteAllText(file, "packed"))
-            .Returns(Task.CompletedTask);
-
-    private void HaveBuilt(string name)
+    private BundleFile Bundle(string name, params int[] sizes)
     {
-        string path = directory.Write($"bundles/{name}.bundle", "bundle");
-        files.Setup(f => f.Find(name)).Returns(path);
-        files.Setup(f => f.PathFor(name)).Returns(path);
-        archive.Setup(a => a.ReadInfo(path)).Returns(new BundleInfo { Name = name, Built = "2026-10-30T09:00:00" });
+        string[] paths = sizes.Length == 1
+            ? [directory.Write($"bundles/{name}.bundle", new string('x', sizes[0]))]
+            : [.. sizes.Select((size, index) => directory.Write($"bundles/{name}.bundle.{index + 1:D3}", new string('x', size)))];
+        return new() { Name = name, Paths = paths, Length = sizes.Sum(), Modified = paths.Max(path => File.GetLastWriteTime(path)), IsSplit = sizes.Length > 1 };
+    }
+
+    private void SetupPack()
+    {
+        archive.Setup(a => a.Pack(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<BundleInfo>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
+            .Callback<string, Stream, BundleInfo, IReadOnlyDictionary<string, string>, CancellationToken>((_, output, _, _, _) => output.Write("packed"u8))
+            .Returns(Task.CompletedTask);
+        files.Setup(f => f.Write(It.IsAny<string>(), It.IsAny<long?>(), It.IsAny<Func<Stream, Task>>(), It.IsAny<CancellationToken>())).Returns(async (string name, long? limit, Func<Stream, Task> write, CancellationToken _) =>
+        {
+            using MemoryStream stream = new();
+            await write(stream);
+            written.Add((name, limit, stream.ToArray()));
+            return Bundle(name, (int)stream.Length);
+        });
+    }
+
+    private BundleFile HaveBuilt(string name, params int[] sizes)
+    {
+        BundleFile file = Bundle(name, sizes.Length == 0 ? [6] : sizes);
+        files.Setup(f => f.Find(name)).Returns(file);
+        archive.Setup(a => a.ReadInfo(file)).Returns(new BundleInfo { Name = name, Built = "2026-10-30T09:00:00" });
+        return file;
     }
 
     [Fact]
     public void List_ReportsEachStandingAndWhenTheFileWasChanged()
     {
-        HaveBuilt("git");
-        File.SetLastWriteTime(directory.Combine("bundles", "git.bundle"), new DateTime(2026, 10, 30, 9, 19, 0));
+        BundleFile built = HaveBuilt("git");
+        files.Setup(f => f.Find("git")).Returns(built with { Modified = new DateTime(2026, 10, 30, 9, 19, 0) });
         gitState.SetupGet(s => s.IsInstalled).Returns(true);
         devState.SetupGet(s => s.IsInstalled).Returns(false);
-        files.Setup(f => f.Find("dev")).Returns((string?)null);
+        files.Setup(f => f.Find("dev")).Returns((BundleFile?)null);
 
         IReadOnlyList<BundleStatus> list = engine.List();
 
@@ -85,7 +103,7 @@ public sealed class BundleEngineTests : IDisposable
     public void List_BuiltOnly_IsAvailable()
     {
         HaveBuilt("git");
-        files.Setup(f => f.Find("dev")).Returns((string?)null);
+        files.Setup(f => f.Find("dev")).Returns((BundleFile?)null);
 
         Assert.Equal(BundleStanding.Available, engine.List()[0].State);
     }
@@ -93,21 +111,24 @@ public sealed class BundleEngineTests : IDisposable
     [Fact]
     public async Task Build_FirstTime_PacksTheBundleFile()
     {
-        files.Setup(f => f.PathFor("git")).Returns(directory.Combine("bundles", "git.bundle"));
         git.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = ["git"] });
         archive.Setup(a => a.ComputeChecksums(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string> { ["a"] = "1" });
         SetupPack();
 
         await engine.Build(["git"]);
 
-        archive.Verify(a => a.Pack(It.IsAny<string>(), directory.Combine("bundles", "git.bundle"), It.Is<BundleInfo>(info => info.Name == "git"), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Once);
+        archive.Verify(a => a.Pack(It.IsAny<string>(), It.IsAny<Stream>(), It.Is<BundleInfo>(info => info.Name == "git"), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Once);
+        (string name, long? limit, byte[] bytes) = Assert.Single(written);
+        Assert.Equal("git", name);
+        Assert.Null(limit);
+        Assert.Equal("packed"u8.ToArray(), bytes);
     }
 
     [Fact]
     public async Task Build_ContentDiffers_ReplacesTheBundleFile()
     {
         HaveBuilt("git");
-        archive.Setup(a => a.ReadChecksums(It.IsAny<string>())).Returns(new Dictionary<string, string> { ["a"] = "old" });
+        archive.Setup(a => a.ReadChecksums(It.IsAny<BundleFile>())).Returns(new Dictionary<string, string> { ["a"] = "old" });
         git.Setup(b => b.IsUnchanged(It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         git.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = [] });
         archive.Setup(a => a.ComputeChecksums(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string> { ["a"] = "new" });
@@ -115,7 +136,7 @@ public sealed class BundleEngineTests : IDisposable
 
         await engine.Build(["git"]);
 
-        archive.Verify(a => a.Pack(It.IsAny<string>(), directory.Combine("bundles", "git.bundle"), It.IsAny<BundleInfo>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Once);
+        archive.Verify(a => a.Pack(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<BundleInfo>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -123,21 +144,21 @@ public sealed class BundleEngineTests : IDisposable
     {
         HaveBuilt("git");
         Dictionary<string, string> same = new() { ["a"] = "same" };
-        archive.Setup(a => a.ReadChecksums(It.IsAny<string>())).Returns(same);
+        archive.Setup(a => a.ReadChecksums(It.IsAny<BundleFile>())).Returns(same);
         archive.Setup(a => a.ComputeChecksums(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(same);
         git.Setup(b => b.IsUnchanged(It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         git.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = [] });
 
         await engine.Build(["git"]);
 
-        archive.Verify(a => a.Pack(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<BundleInfo>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
+        archive.Verify(a => a.Pack(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<BundleInfo>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Build_UnchangedUpstream_SkipsDownloadingEntirely()
     {
         HaveBuilt("git");
-        archive.Setup(a => a.ReadChecksums(It.IsAny<string>())).Returns(new Dictionary<string, string>());
+        archive.Setup(a => a.ReadChecksums(It.IsAny<BundleFile>())).Returns(new Dictionary<string, string>());
         git.Setup(b => b.IsUnchanged(It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         await engine.Build(["git"]);
@@ -148,12 +169,9 @@ public sealed class BundleEngineTests : IDisposable
     [Fact]
     public async Task Build_All_BuildsEveryBundleOnce()
     {
-        files.Setup(f => f.Find(It.IsAny<string>())).Returns((string?)null);
-        files.Setup(f => f.PathFor(It.IsAny<string>())).Returns((string name) => directory.Combine("bundles", name + ".bundle"));
+        files.Setup(f => f.Find(It.IsAny<string>())).Returns((BundleFile?)null);
         archive.Setup(a => a.ComputeChecksums(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string>());
-        archive.Setup(a => a.Pack(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<BundleInfo>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, BundleInfo, IReadOnlyDictionary<string, string>, CancellationToken>((_, file, _, _, _) => File.WriteAllText(file, "packed"))
-            .Returns(Task.CompletedTask);
+        SetupPack();
         git.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = [] });
         dev.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = [] });
 
@@ -206,7 +224,7 @@ public sealed class BundleEngineTests : IDisposable
     [Fact]
     public async Task Install_NotBuilt_Throws()
     {
-        files.Setup(f => f.Find("git")).Returns((string?)null);
+        files.Setup(f => f.Find("git")).Returns((BundleFile?)null);
 
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Install(["git"], new()));
 
@@ -218,7 +236,7 @@ public sealed class BundleEngineTests : IDisposable
     {
         HaveBuilt("git");
         gitState.SetupGet(s => s.IsInstalled).Returns(false);
-        archive.Setup(a => a.Extract(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        archive.Setup(a => a.Extract(It.IsAny<BundleFile>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         archive.Setup(a => a.Verify(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         await engine.Install(["git"], new());
@@ -236,7 +254,7 @@ public sealed class BundleEngineTests : IDisposable
         HaveBuilt("git");
         gitState.SetupGet(s => s.IsInstalled).Returns(false);
         machine.SetupGet(m => m.SystemName).Returns(system);
-        archive.Setup(a => a.Extract(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        archive.Setup(a => a.Extract(It.IsAny<BundleFile>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         archive.Setup(a => a.Verify(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
         await engine.Install(["git"], new());
@@ -301,7 +319,7 @@ public sealed class BundleEngineTests : IDisposable
     public async Task Reinstall_MissingFile_ChangesNothing()
     {
         gitState.SetupGet(s => s.IsInstalled).Returns(true);
-        files.Setup(f => f.Find("git")).Returns((string?)null);
+        files.Setup(f => f.Find("git")).Returns((BundleFile?)null);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Reinstall(["git"], new()));
 
@@ -409,5 +427,151 @@ public sealed class BundleEngineTests : IDisposable
         Assert.Equal(["dev", "git"], order);
         gitState.Verify(s => s.End(), Times.Once);
         devState.Verify(s => s.End(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Build_WithALimit_PassesItToTheFileWriter()
+    {
+        git.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = [] });
+        archive.Setup(a => a.ComputeChecksums(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string> { ["a"] = "1" });
+        SetupPack();
+
+        await engine.Build(["git"], 4_700_000_000);
+
+        Assert.Equal(4_700_000_000, Assert.Single(written).Limit);
+    }
+
+    [Theory]
+    [InlineData(999_999)]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public async Task Build_LimitBelowOneMegabyte_Throws(long limit)
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => engine.Build(["git"], limit));
+
+        git.Verify(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Build_OneMegabyteLimit_IsAllowed()
+    {
+        git.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = [] });
+        archive.Setup(a => a.ComputeChecksums(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string>());
+        SetupPack();
+
+        await engine.Build(["git"], 1_000_000);
+
+        Assert.Equal(1_000_000, Assert.Single(written).Limit);
+    }
+
+    [Fact]
+    public async Task Build_UnchangedAndAlreadyLaidOutForTheLimit_IsLeftAlone()
+    {
+        HaveBuilt("git", 1_000_000, 1_000_000, 300_000);
+        archive.Setup(a => a.ReadChecksums(It.IsAny<BundleFile>())).Returns(new Dictionary<string, string>());
+        git.Setup(b => b.IsUnchanged(It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        await engine.Build(["git"], 1_000_000);
+
+        files.Verify(f => f.Write(It.IsAny<string>(), It.IsAny<long?>(), It.IsAny<Func<Stream, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
+        git.Verify(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Build_UnchangedButNotLaidOutForTheLimit_CutsTheExistingFilesUpWithoutDownloading()
+    {
+        BundleFile existing = HaveBuilt("git", 2_500_000);
+        archive.Setup(a => a.ReadChecksums(It.IsAny<BundleFile>())).Returns(new Dictionary<string, string>());
+        git.Setup(b => b.IsUnchanged(It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        files.Setup(f => f.OpenRead(existing)).Returns(() => new MemoryStream("0123456789"u8.ToArray()));
+        SetupPack();
+
+        await engine.Build(["git"], 1_000_000);
+
+        git.Verify(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Single(written, item => item.Limit == 1_000_000 && item.Bytes.SequenceEqual("0123456789"u8.ToArray()));
+    }
+
+    [Fact]
+    public async Task Build_UnchangedSplitBundleAndNoLimit_IsJoinedIntoOneFile()
+    {
+        BundleFile existing = HaveBuilt("git", 100, 100, 30);
+        archive.Setup(a => a.ReadChecksums(It.IsAny<BundleFile>())).Returns(new Dictionary<string, string>());
+        git.Setup(b => b.IsUnchanged(It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        files.Setup(f => f.OpenRead(existing)).Returns(() => new MemoryStream(new byte[230]));
+        SetupPack();
+
+        await engine.Build(["git"]);
+
+        (_, long? limit, byte[] bytes) = Assert.Single(written);
+        Assert.Null(limit);
+        Assert.Equal(230, bytes.Length);
+    }
+
+    [Fact]
+    public async Task Build_ExistingFilesWithAProblem_AreBuiltAgainInsteadOfTrusted()
+    {
+        BundleFile broken = Bundle("git", 100, 100, 30) with { Problem = "part 2 is missing" };
+        files.Setup(f => f.Find("git")).Returns(broken);
+        git.Setup(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new BuildResult { Components = [] });
+        archive.Setup(a => a.ComputeChecksums(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string> { ["a"] = "1" });
+        SetupPack();
+
+        await engine.Build(["git"], 2_000_000);
+
+        git.Verify(b => b.Build(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        archive.Verify(a => a.ReadChecksums(It.IsAny<BundleFile>()), Times.Never);
+        log.Verify(l => l.Write(LogLevel.Warning, It.Is<string>(text => text.Contains("part 2 is missing"))), Times.Once);
+    }
+
+    [Fact]
+    public void List_ReportsHowManyFilesABundleIsInAndWhatIsWrongWithThem()
+    {
+        BundleFile built = Bundle("git", 100, 100, 30) with { Problem = "part 2 is missing" };
+        files.Setup(f => f.Find("git")).Returns(built);
+        files.Setup(f => f.Find("dev")).Returns((BundleFile?)null);
+
+        IReadOnlyList<BundleStatus> list = engine.List();
+
+        Assert.Equal(3, list[0].FileCount);
+        Assert.Equal("part 2 is missing", list[0].FileProblem);
+        Assert.Equal(0, list[1].FileCount);
+        Assert.Null(list[1].FileProblem);
+    }
+
+    [Fact]
+    public async Task Install_ABundleInParts_IsExtractedFromTheWholeBundleAndItsTotalSizeIsChecked()
+    {
+        BundleFile parts = HaveBuilt("git", 40, 40, 10);
+        gitState.SetupGet(s => s.IsInstalled).Returns(false);
+        archive.Setup(a => a.Extract(It.IsAny<BundleFile>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        archive.Setup(a => a.Verify(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        await engine.Install(["git"], new());
+
+        archive.Verify(a => a.Extract(parts, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        git.Verify(b => b.Install(It.IsAny<InstallContext>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Install_PartsWithAProblem_IsRefusedBeforeAnythingIsChanged()
+    {
+        files.Setup(f => f.Find("git")).Returns(Bundle("git", 40, 40, 10) with { Problem = "part 2 is missing" });
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Install(["git"], new()));
+
+        Assert.Contains("part 2 is missing", error.Message);
+        Assert.Contains("all of its parts", error.Message);
+        git.Verify(b => b.Install(It.IsAny<InstallContext>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Install_NotBuilt_MentionsThePartsToo()
+    {
+        files.Setup(f => f.Find("git")).Returns((BundleFile?)null);
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Install(["git"], new()));
+
+        Assert.Contains("git.bundle.001", error.Message);
     }
 }

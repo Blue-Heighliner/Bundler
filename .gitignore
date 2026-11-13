@@ -33,9 +33,9 @@ Thumbs.db
 
 publish/
 
-# Built bundle files (the app keeps them in a Bundles folder next to the executable) and disc sets made from them are never committed.
+# Built bundle files (the app keeps them in a Bundles folder next to the executable) are never committed.
 Bundles/
 *.bundle
 *.bundle.partial
+*.bundle.[0-9][0-9][0-9]*
 cache/
-discs/

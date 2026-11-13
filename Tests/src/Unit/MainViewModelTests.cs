@@ -21,7 +21,7 @@ public sealed class MainViewModelTests
         ]);
         engine.Setup(e => e.InstallPlan(It.IsAny<IReadOnlyList<string>>())).Returns((IReadOnlyList<string> names) => names);
         dialogs.Setup(d => d.Confirm(It.IsAny<string>())).ReturnsAsync(true);
-        model = new(engine.Object, machine.Object, services.Object, log, dialogs.Object, new ImmediateDispatcher());
+        model = new(engine.Object, machine.Object, services.Object, new ByteSizes(), log, dialogs.Object, new ImmediateDispatcher());
     }
 
     private sealed class ImmediateDispatcher : IUiDispatcher
@@ -77,7 +77,7 @@ public sealed class MainViewModelTests
         await model.Start();
         model.Bundles[0].IsSelected = true;
         TaskCompletionSource release = new();
-        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>())).Returns(release.Task);
+        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<long?>(), It.IsAny<CancellationToken>())).Returns(release.Task);
 
         Task running = model.Build();
         await Task.Delay(50);
@@ -203,7 +203,7 @@ public sealed class MainViewModelTests
 
         await model.Build();
 
-        engine.Verify(e => e.Build(It.Is<IReadOnlyList<string>>(names => names.SequenceEqual(new[] { "git", "dev" })), It.IsAny<CancellationToken>()), Times.Once);
+        engine.Verify(e => e.Build(It.Is<IReadOnlyList<string>>(names => names.SequenceEqual(new[] { "git", "dev" })), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.False(model.IsBusy);
     }
 
@@ -212,7 +212,7 @@ public sealed class MainViewModelTests
     {
         await model.Start();
         model.Bundles[0].IsSelected = true;
-        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("no network"));
+        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<long?>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("no network"));
 
         await model.Build();
 
@@ -225,7 +225,7 @@ public sealed class MainViewModelTests
     {
         await model.Start();
         model.Bundles[0].IsSelected = true;
-        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>())).ThrowsAsync(new OperationCanceledException());
+        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<long?>(), It.IsAny<CancellationToken>())).ThrowsAsync(new OperationCanceledException());
 
         await model.Build();
 
@@ -238,7 +238,7 @@ public sealed class MainViewModelTests
         await model.Start();
         model.SelectAll(true);
         TaskCompletionSource release = new();
-        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>())).Returns(release.Task);
+        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<long?>(), It.IsAny<CancellationToken>())).Returns(release.Task);
 
         Task running = model.Build();
         await Task.Delay(50);
@@ -250,7 +250,7 @@ public sealed class MainViewModelTests
         await model.Install();
         await model.Uninstall();
         await model.Build();
-        engine.Verify(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()), Times.Once);
+        engine.Verify(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Once);
         engine.Verify(e => e.Install(It.IsAny<IReadOnlyList<string>>(), It.IsAny<RunOptions>(), It.IsAny<CancellationToken>()), Times.Never);
         engine.Verify(e => e.Uninstall(It.IsAny<IReadOnlyList<string>>(), It.IsAny<RunOptions>(), It.IsAny<CancellationToken>()), Times.Never);
 
@@ -265,7 +265,7 @@ public sealed class MainViewModelTests
     {
         await model.Start();
         model.Bundles[0].IsSelected = true;
-        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>())).Returns(async (IReadOnlyList<string> _, CancellationToken token) => await Task.Delay(Timeout.Infinite, token));
+        engine.Setup(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<long?>(), It.IsAny<CancellationToken>())).Returns(async (IReadOnlyList<string> _, long? _, CancellationToken token) => await Task.Delay(Timeout.Infinite, token));
 
         Task running = model.Build();
         await Task.Delay(50);
@@ -358,5 +358,62 @@ public sealed class MainViewModelTests
         LogEntry entry = new() { Text = "x", Level = Enum.Parse<LogLevel>(level) };
 
         Assert.Equal(Avalonia.Media.Color.Parse(expected), ((Avalonia.Media.ISolidColorBrush)entry.Foreground).Color);
+    }
+
+    [Fact]
+    public async Task Build_WithAMaxSize_PassesTheParsedLimit()
+    {
+        await model.Start();
+        model.Bundles[0].IsSelected = true;
+        model.MaxSize = "4.7G";
+
+        await model.Build();
+
+        engine.Verify(e => e.Build(It.IsAny<IReadOnlyList<string>>(), 4_700_000_000, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Build_WithoutAMaxSize_PassesNoLimit()
+    {
+        await model.Start();
+        model.Bundles[0].IsSelected = true;
+
+        await model.Build();
+
+        engine.Verify(e => e.Build(It.IsAny<IReadOnlyList<string>>(), null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Build_WithAMaxSizeThatIsNotASize_LogsTheErrorAndBuildsNothing()
+    {
+        await model.Start();
+        model.Bundles[0].IsSelected = true;
+        model.MaxSize = "lots";
+
+        await model.Build();
+
+        engine.Verify(e => e.Build(It.IsAny<IReadOnlyList<string>>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains(model.Log, entry => entry.Level == LogLevel.Error && entry.Text.Contains("lots"));
+        Assert.False(model.IsBusy);
+    }
+
+    [Fact]
+    public void MaxSize_StartsEmptyAndNeverBecomesNull()
+    {
+        Assert.Equal(string.Empty, model.MaxSize);
+
+        model.MaxSize = null!;
+
+        Assert.Equal(string.Empty, model.MaxSize);
+    }
+
+    [Fact]
+    public void BundleFile_TellsThePartsAndWhatIsWrongWithThem()
+    {
+        BundleStatus status = new() { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) };
+
+        Assert.Equal("2026-10-30 09:19", new BundleRowViewModel(status, [], false).BundleFile);
+        Assert.Equal("2026-10-30 09:19, 4 parts", new BundleRowViewModel(status with { FileCount = 4 }, [], false).BundleFile);
+        Assert.Equal("2026-10-30 09:19, 4 parts, incomplete: part 2 is missing", new BundleRowViewModel(status with { FileCount = 4, FileProblem = "part 2 is missing" }, [], false).BundleFile);
     }
 }

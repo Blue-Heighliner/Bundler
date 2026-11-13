@@ -22,4 +22,10 @@ internal sealed record BundleStatus
 
     /// <summary>Gets when the bundle file in the Bundles folder was last changed (local time), or <see langword="null" /> when there is none.</summary>
     public DateTime? FileModified { get; init; }
+
+    /// <summary>Gets the number of files the bundle is in: 0 when it is not built, 1 for a single file, more for a bundle in parts.</summary>
+    public int FileCount { get; init; }
+
+    /// <summary>Gets what is wrong with the bundle's parts (one is missing, for example), or <see langword="null" /> when nothing is.</summary>
+    public string? FileProblem { get; init; }
 }

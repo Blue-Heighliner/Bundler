@@ -18,7 +18,7 @@ internal interface ICommandLine
 }
 
 /// <inheritdoc />
-internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
+internal sealed class CommandLine(IBundleEngine engine, IByteSizes sizes, ILog log) : ICommandLine
 {
     /// <inheritdoc />
     public string Help
@@ -27,13 +27,17 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
 
               Bundler                       open the window
               Bundler list                  list the bundles
-              Bundler build <bundle|all>    online computer: download the latest stable versions into <bundle>.bundle in the Bundles folder
+              Bundler build <bundle|all>    online computer: download the latest stable versions into <bundle>.bundle in the Bundles folder (or into
+                                            <bundle>.bundle.001, .002 ... when --max-size is given and the bundle is bigger)
               Bundler install <bundle>      offline computer: install the bundle file found in the Bundles folder
               Bundler uninstall <bundle>    offline computer: remove what the bundle installed
               Bundler reinstall <bundle>    offline computer: uninstall the bundle (if installed) and install it again from its file
 
             Options: -y, --yes        do not ask for confirmation
                      --bundles PATH   use this folder for the bundle files instead of "Bundles" next to the app
+                     --max-size SIZE  build: no bundle file gets bigger than SIZE (4700000000, 4.7G, 700M, 4GiB; at least 1M); a bigger
+                                      bundle is cut into parts of exactly SIZE, the last one holding the rest. Installs read the
+                                      parts of a bundle in the Bundles folder like one file.
 
             The app always runs as root (it starts itself again through sudo when needed), so what it keeps is in root's app data folder.
             """;
@@ -43,6 +47,7 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
     {
         string command = arguments.Count > 0 ? arguments[0] : "help";
         bool yes = false;
+        long? maxSize = null;
         List<string> names = [];
         for (int index = 1; index < arguments.Count; index++)
         {
@@ -50,6 +55,19 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
             {
                 case "-y" or "--yes":
                     yes = true;
+                    break;
+                case { } sizeOption when sizeOption == "--max-size" || sizeOption.StartsWith("--max-size=", StringComparison.Ordinal):
+                    string? value = sizeOption == "--max-size" ? (index + 1 < arguments.Count ? arguments[++index] : null) : sizeOption["--max-size=".Length..];
+                    try
+                    {
+                        maxSize = sizes.Parse(value) ?? throw new FormatException("--max-size needs a size (examples: 4700000000, 4.7G, 700M)");
+                    }
+                    catch (FormatException exception)
+                    {
+                        log.Error(exception.Message);
+                        return 2;
+                    }
+
                     break;
                 case { } option when option.StartsWith('-'):
                     log.Error($"unknown option {option}");
@@ -68,7 +86,7 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
                     Print(engine.List());
                     return 0;
                 case "build":
-                    return await Required(names, command, async () => await engine.Build(names, cancellation));
+                    return await Required(names, command, async () => await engine.Build(names, maxSize, cancellation));
                 case "install" or "uninstall" or "remove" or "reinstall":
                     return await Required(names, command, () => Change(command, names, yes, cancellation));
                 case "help" or "-h" or "--help":
@@ -124,10 +142,11 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
 
     private void Print(IReadOnlyList<BundleStatus> rows)
     {
-        string[] modified = [.. rows.Select(row => row.FileModified is DateTime time ? time.ToString("yyyy-MM-dd HH:mm") : "-")];
+        string[] modified = [.. rows.Select(row => row.FileModified is DateTime time ? time.ToString("yyyy-MM-dd HH:mm") + (row.FileCount > 1 ? $" ({row.FileCount} parts)" : string.Empty) + (row.FileProblem is not null ? " INCOMPLETE" : string.Empty) : "-")];
+        int file = Math.Max(11, modified.Max(text => text.Length));
         int name = Math.Max(4, rows.Max(row => row.Name.Length));
         int target = Math.Max(6, rows.Max(row => row.Target.Length));
-        Console.Out.WriteLine($"\n{"NAME".PadRight(name)} {"STATE",-10} {"TARGET".PadRight(target)} {"BUNDLE FILE",-16} {"NEEDS",-6} DESCRIPTION");
+        Console.Out.WriteLine($"\n{"NAME".PadRight(name)} {"STATE",-10} {"TARGET".PadRight(target)} {"BUNDLE FILE".PadRight(file)} {"NEEDS",-6} DESCRIPTION");
         for (int index = 0; index < rows.Count; index++)
         {
             BundleStatus row = rows[index];
@@ -137,7 +156,7 @@ internal sealed class CommandLine(IBundleEngine engine, ILog log) : ICommandLine
                 BundleStanding.Available => "available",
                 _ => "installed",
             };
-            Console.Out.WriteLine($"{row.Name.PadRight(name)} {state,-10} {row.Target.PadRight(target)} {modified[index],-16} {(row.Requires.Count > 0 ? string.Join(',', row.Requires) : "-"),-6} {row.Description}");
+            Console.Out.WriteLine($"{row.Name.PadRight(name)} {state,-10} {row.Target.PadRight(target)} {modified[index].PadRight(file)} {(row.Requires.Count > 0 ? string.Join(',', row.Requires) : "-"),-6} {row.Description}");
         }
 
         Console.Out.WriteLine("\ninstalled: on this computer   available: built, ready to install   not built: run \"build <name>\" on an online computer\n");

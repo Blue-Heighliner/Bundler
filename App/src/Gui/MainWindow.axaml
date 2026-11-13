@@ -54,6 +54,8 @@
             <Button Name="Uninstall" Content="Uninstall" IsEnabled="{Binding CanInstall}" />
             <Button Name="Reinstall" Content="Reinstall" ToolTip.Tip="Uninstall the ticked bundles that are installed, then install them from their files" IsEnabled="{Binding CanInstall}" />
             <Button Name="Cancel" Classes="danger" Content="Cancel" IsEnabled="{Binding IsBusy}" />
+            <TextBlock Text="Max file size" Classes="muted" VerticalAlignment="Center" Margin="14,0,0,0" />
+            <TextBox Name="MaxSize" Width="96" VerticalAlignment="Center" PlaceholderText="No limit" Text="{Binding MaxSize}" IsEnabled="{Binding !IsBusy}" ToolTip.Tip="Build only: no bundle file gets bigger than this (for example 4.7G or 700M); a bigger bundle is cut into parts of exactly this size, which an install reads like one file. Empty: one file." />
             </StackPanel>
             <app:WindowControlsView Grid.Column="2" />
           </Grid>

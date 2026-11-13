@@ -10,9 +10,13 @@ Runnable examples of the app in different situations.
 
 Writes `git.bundle` into the `Bundles` folder next to the app (`--bundles PATH` picks another folder). The app asks for the administrator password first, because it always runs as root. Building `all` builds every bundle. Building again replaces the file with one built from the latest versions; when nothing upstream changed the file is left as it is.
 
+### Splitting for discs and small file systems
+
+`--max-size 4.7G` (or the Max file size box in the window) keeps every file at or under that size: a bigger bundle is written as `git.bundle.001`, `.002`, ... with every part exactly that big except the last. Pick the size so parts fill your medium (the parts of a big bundle then pack onto discs next to the small bundles). Building again with another size re-cuts an unchanged bundle without downloading it again.
+
 ## Move it to the offline computer
 
-Copy the `.bundle` files you want into the `Bundles` folder next to the app on the offline computer. A file with the same name is replaced.
+Copy the `.bundle` files you want into the `Bundles` folder next to the app on the offline computer. A file with the same name is replaced. A bundle in parts needs all of its `.001`, `.002`, ... files in the same folder (they can come from different discs); the app reads them as one bundle and refuses an install while one is missing.
 
 The app can also run straight from a disc or stick that holds `Bundler` and a `Bundles` folder side by side: it finds `Bundles` next to itself, whatever the mount point. Nothing is copied beforehand, but an install unpacks each bundle into `/var/tmp` first, so the computer needs the bundle's size plus 0.5 GB free there (the `gemma` model, 18.7 GB, then moves into place and needs only 2 GB more when `/var/tmp` and `/usr/share/ollama` are on the same disk, the whole model size again when they are not). If the medium is mounted `noexec`, copy `Bundler` to the computer and start it with `--bundles` pointing at the folder on the medium.
 

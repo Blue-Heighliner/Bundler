@@ -74,6 +74,7 @@ internal static class ServiceCollectionExtensions
             services.AddSingleton<ILicenseTexts, LicenseTexts>();
             services.AddSingleton<IBundleEngine, BundleEngine>();
             services.AddSingleton<IElevator, Elevator>();
+            services.AddSingleton<IByteSizes, ByteSizes>();
             services.AddSingleton<ICommandLine, CommandLine>();
             return services;
         }

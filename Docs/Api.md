@@ -9,18 +9,18 @@ One executable. Without arguments it opens the window; with arguments it runs a 
 | Command | Where | What it does |
 |---|---|---|
 | `list` | anywhere | One row per bundle: `not built`, `available` (file in the Bundles folder) or `installed`, with its target system and when the bundle file was last changed. |
-| `build <bundle...\|all>` | online computer | Downloads the latest stable version of everything the bundle needs and packs it into `<name>.bundle` in the Bundles folder, replacing the file there, or does nothing if the file already holds exactly that. |
+| `build <bundle...\|all>` | online computer | Downloads the latest stable version of everything the bundle needs and packs it into `<name>.bundle` in the Bundles folder (or `<name>.bundle.001`, `.002`, ... with `--max-size`), replacing the files there, or does nothing if they already hold exactly that in that layout. |
 | `install <bundle...>` | offline computer | Installs the bundle file found in the Bundles folder, after the bundles it needs. A bundle that is installed already is skipped: reinstall it to use a different file. |
 | `reinstall <bundle...>` | offline computer | Uninstalls the bundles that are installed and installs all of them again from their files, asking once. Refuses before changing anything if another installed bundle needs one of them. |
 | `uninstall <bundle...>` (`remove`) | offline computer | Removes what the bundle installed. Refuses while another installed bundle needs it. |
 
-Options: `-y/--yes` (do not ask), `-f/--force` (install a bundle that is installed already, over it), `--bundles PATH` (the folder with the bundle files).
+Options: `-y/--yes` (do not ask), `-f/--force` (install a bundle that is installed already, over it), `--bundles PATH` (the folder with the bundle files), `--max-size SIZE` (build only: no bundle file may be bigger than SIZE, a bigger bundle is split into parts of exactly SIZE with a smaller last part; `4G` and `700M` are decimal, `4GiB` and `700MiB` binary, plain numbers are bytes, at least 1 MB).
 
 On Linux the app always runs as root. If it is started as anyone else it asks for the password (`sudo` in a terminal, `pkexec` otherwise), starts itself again as root with the same arguments and returns that run's exit code.
 
 ## Bundles folder
 
-The Bundles folder is `Bundles` next to the executable, or the folder given with `--bundles PATH`. A bundle file is named `<name>.bundle`. Bundles have no revision numbers: a file holds the versions that were latest when it was built. To move a computer to a newer file, reinstall the bundle. See `Docs/Components/Bundles.md`.
+The Bundles folder is `Bundles` next to the executable, or the folder given with `--bundles PATH`. A bundle file is named `<name>.bundle`, or `<name>.bundle.001`, `.002`, ... when it is in parts; all commands read parts as if they were one file, and `list` shows the number of parts and marks an incomplete set. Bundles have no revision numbers: a file holds the versions that were latest when it was built. To move a computer to a newer file, reinstall the bundle. See `Docs/Components/Bundles.md`.
 
 ## Where the app keeps its files
 

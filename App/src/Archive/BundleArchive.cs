@@ -18,38 +18,38 @@ internal interface IBundleArchive
     /// <summary>
     /// Reads the checksums of the content of a bundle file (without <c>bundle.info</c>), from its <c>SHA256SUMS</c>.
     /// </summary>
-    /// <param name="file">The bundle file.</param>
+    /// <param name="file">The bundle, in one file or in parts.</param>
     /// <returns>The checksum of each file by its relative path; empty when the file has none.</returns>
-    IReadOnlyDictionary<string, string> ReadChecksums(string file);
+    IReadOnlyDictionary<string, string> ReadChecksums(BundleFile file);
 
     /// <summary>
     /// Reads the <c>bundle.info</c> of a bundle file, which is its first member and so quick to reach.
     /// </summary>
-    /// <param name="file">The bundle file.</param>
+    /// <param name="file">The bundle, in one file or in parts.</param>
     /// <returns>The info, or <see langword="null" /> when the file is not a readable bundle.</returns>
-    BundleInfo? ReadInfo(string file);
+    BundleInfo? ReadInfo(BundleFile file);
 
     /// <summary>
-    /// Writes <c>bundle.info</c> and <c>SHA256SUMS</c> into a folder and packs the folder into a bundle file. The file appears
-    /// only when it is complete.
+    /// Writes <c>bundle.info</c> and <c>SHA256SUMS</c> into a folder and packs the folder into a stream, which is where the
+    /// bundle file (or its parts) is made. The stream is left open.
     /// </summary>
     /// <param name="directory">The folder with the payload.</param>
-    /// <param name="file">The bundle file to write.</param>
+    /// <param name="output">The stream to write the bundle's bytes to.</param>
     /// <param name="info">What the bundle says about itself.</param>
     /// <param name="checksums">The content checksums from <see cref="ComputeChecksums" />.</param>
     /// <param name="cancellation">Stops the work when cancelled.</param>
-    /// <returns>A task that completes when the file is written.</returns>
-    Task Pack(string directory, string file, BundleInfo info, IReadOnlyDictionary<string, string> checksums, CancellationToken cancellation = default);
+    /// <returns>A task that completes when everything is written.</returns>
+    Task Pack(string directory, Stream output, BundleInfo info, IReadOnlyDictionary<string, string> checksums, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Unpacks a bundle file.
+    /// Unpacks a bundle.
     /// </summary>
-    /// <param name="file">The bundle file.</param>
+    /// <param name="file">The bundle, in one file or in parts.</param>
     /// <param name="directory">The folder to unpack into.</param>
     /// <param name="cancellation">Stops the work when cancelled.</param>
     /// <returns>A task that completes when everything is unpacked.</returns>
     /// <exception cref="InvalidDataException">The file is damaged or incomplete.</exception>
-    Task Extract(string file, string directory, CancellationToken cancellation = default);
+    Task Extract(BundleFile file, string directory, CancellationToken cancellation = default);
 
     /// <summary>
     /// Checks an unpacked bundle against its <c>SHA256SUMS</c>.
@@ -61,7 +61,7 @@ internal interface IBundleArchive
 }
 
 /// <inheritdoc />
-internal sealed class BundleArchive(IHashing hashing) : IBundleArchive
+internal sealed class BundleArchive(IHashing hashing, IBundleFiles files) : IBundleArchive
 {
     private static readonly string[] reserved = ["bundle.info", "SHA256SUMS"];
 
@@ -82,11 +82,11 @@ internal sealed class BundleArchive(IHashing hashing) : IBundleArchive
     }
 
     /// <inheritdoc />
-    public IReadOnlyDictionary<string, string> ReadChecksums(string file)
+    public IReadOnlyDictionary<string, string> ReadChecksums(BundleFile file)
     {
         try
         {
-            using FileStream stream = File.OpenRead(file);
+            using Stream stream = files.OpenRead(file);
             using TarReader reader = new(stream);
             int seen = 0;
             while (reader.GetNextEntry() is TarEntry entry && seen++ < 4)
@@ -106,11 +106,11 @@ internal sealed class BundleArchive(IHashing hashing) : IBundleArchive
     }
 
     /// <inheritdoc />
-    public BundleInfo? ReadInfo(string file)
+    public BundleInfo? ReadInfo(BundleFile file)
     {
         try
         {
-            using FileStream stream = File.OpenRead(file);
+            using Stream stream = files.OpenRead(file);
             using TarReader reader = new(stream);
             int seen = 0;
             while (reader.GetNextEntry() is TarEntry entry && seen++ < 4)
@@ -130,7 +130,7 @@ internal sealed class BundleArchive(IHashing hashing) : IBundleArchive
     }
 
     /// <inheritdoc />
-    public async Task Pack(string directory, string file, BundleInfo info, IReadOnlyDictionary<string, string> checksums, CancellationToken cancellation = default)
+    public async Task Pack(string directory, Stream output, BundleInfo info, IReadOnlyDictionary<string, string> checksums, CancellationToken cancellation = default)
     {
         string infoPath = Path.Combine(directory, "bundle.info");
         await File.WriteAllTextAsync(infoPath, info.Format(), cancellation);
@@ -138,45 +138,30 @@ internal sealed class BundleArchive(IHashing hashing) : IBundleArchive
         SortedDictionary<string, string> sums = new(checksums.ToDictionary(), StringComparer.Ordinal) { ["bundle.info"] = await hashing.Sha256(infoPath, cancellation) };
         await File.WriteAllTextAsync(Path.Combine(directory, "SHA256SUMS"), string.Concat(sums.Select(pair => $"{pair.Value}  ./{pair.Key}\n")), cancellation);
 
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(file))!);
-        string partial = file + ".partial";
-        try
+        await using TarWriter writer = new(output, TarEntryFormat.Pax, leaveOpen: true);
+        foreach (string relative in reserved.Concat(checksums.Keys.Order(StringComparer.Ordinal)))
         {
-            await using (FileStream output = new(partial, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20, useAsync: true))
-            await using (TarWriter writer = new(output, TarEntryFormat.Pax))
+            cancellation.ThrowIfCancellationRequested();
+            string path = Path.Combine(directory, relative);
+            await using FileStream source = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, useAsync: true);
+            PaxTarEntry entry = new(TarEntryType.RegularFile, relative)
             {
-                foreach (string relative in reserved.Concat(checksums.Keys.Order(StringComparer.Ordinal)))
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    string path = Path.Combine(directory, relative);
-                    await using FileStream source = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, useAsync: true);
-                    PaxTarEntry entry = new(TarEntryType.RegularFile, relative)
-                    {
-                        DataStream = source,
-                        Mode = File.GetUnixFileMode(path),
-                        ModificationTime = File.GetLastWriteTimeUtc(path),
-                    };
-                    await writer.WriteEntryAsync(entry, cancellation);
-                }
-            }
+                DataStream = source,
+                Mode = File.GetUnixFileMode(path),
+                ModificationTime = File.GetLastWriteTimeUtc(path),
+            };
+            await writer.WriteEntryAsync(entry, cancellation);
         }
-        catch
-        {
-            File.Delete(partial);
-            throw;
-        }
-
-        File.Move(partial, file, overwrite: true);
     }
 
     /// <inheritdoc />
-    public async Task Extract(string file, string directory, CancellationToken cancellation = default)
+    public async Task Extract(BundleFile file, string directory, CancellationToken cancellation = default)
     {
         string root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(directory);
         try
         {
-            await using FileStream stream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, useAsync: true);
+            await using Stream stream = files.OpenRead(file);
             await using TarReader reader = new(stream);
             while (await reader.GetNextEntryAsync(copyData: false, cancellation) is TarEntry entry)
             {
@@ -197,7 +182,7 @@ internal sealed class BundleArchive(IHashing hashing) : IBundleArchive
         }
         catch (EndOfStreamException exception)
         {
-            throw new InvalidDataException($"{file} is damaged or incomplete", exception);
+            throw new InvalidDataException($"{file.Name} is damaged or incomplete (a part may be missing or cut short)", exception);
         }
     }
 

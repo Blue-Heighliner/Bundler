@@ -23,6 +23,12 @@ internal interface IMainViewModel : INotifyPropertyChanged
     /// <summary>Gets a notice shown above the list when the app cannot do its work here, or empty.</summary>
     string Notice { get; }
 
+    /// <summary>
+    /// Gets or sets the size limit for the files of a build, as typed (for example <c>4.7G</c>, <c>700M</c> or <c>4700000000</c>); empty
+    /// means no limit. A bundle bigger than the limit is built in parts of exactly that size.
+    /// </summary>
+    string MaxSize { get; set; }
+
     /// <summary>Gets a value indicating whether work is running.</summary>
     bool IsBusy { get; }
 
@@ -97,12 +103,13 @@ internal interface IMainViewModel : INotifyPropertyChanged
 }
 
 /// <inheritdoc cref="IMainViewModel" />
-internal sealed class MainViewModel(IBundleEngine engine, IMachine machine, IBundleServices services, IObservableLog log, IDialogs dialogs, IUiDispatcher dispatcher) : ViewModelBase, IMainViewModel
+internal sealed class MainViewModel(IBundleEngine engine, IMachine machine, IBundleServices services, IByteSizes sizes, IObservableLog log, IDialogs dialogs, IUiDispatcher dispatcher) : ViewModelBase, IMainViewModel
 {
     private readonly int maxLines = 5000;
     private CancellationTokenSource? cancellation;
     private BundleRowViewModel? current;
     private string activity = "Ready";
+    private string maxSize = string.Empty;
     private bool busy;
 
     /// <inheritdoc />
@@ -136,6 +143,13 @@ internal sealed class MainViewModel(IBundleEngine engine, IMachine machine, IBun
 
     /// <inheritdoc />
     public string Notice => machine.IsLinux ? string.Empty : "Bundler builds and installs bundles on Ubuntu Linux only. This window can only show the list here.";
+
+    /// <inheritdoc />
+    public string MaxSize
+    {
+        get => maxSize;
+        set => Set(ref maxSize, value ?? string.Empty);
+    }
 
     /// <inheritdoc />
     public bool IsBusy
@@ -224,8 +238,19 @@ internal sealed class MainViewModel(IBundleEngine engine, IMachine machine, IBun
             return Task.CompletedTask;
         }
 
+        long? limit;
+        try
+        {
+            limit = sizes.Parse(MaxSize);
+        }
+        catch (FormatException exception)
+        {
+            log.Error(exception.Message);
+            return Task.CompletedTask;
+        }
+
         List<string> names = Selected();
-        return Run("Build", "Building", null, token => engine.Build(names, token));
+        return Run("Build", "Building", null, token => engine.Build(names, limit, token));
     }
 
     /// <inheritdoc />

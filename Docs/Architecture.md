@@ -14,7 +14,7 @@ The app ships as one self-contained executable per platform so an offline machin
 
 ## One file per bundle, no versions of bundles
 
-A bundle is the file `<name>.bundle`, built from the latest stable versions of its services. There is no revision number: a second build replaces the file, and a build that would produce exactly the content of the existing file (same checksums) leaves it alone. The alternative, numbered revisions with upgrade and downgrade rules at install, needed the app to decide what is newer and to reconcile two files of the same bundle. Leaving that to the person keeps the app simple: it shows what is installed and what the file holds, install skips an installed bundle, and an update is a reinstall: an uninstall followed by an install of the new file.
+A bundle is the file `<name>.bundle` (or its numbered parts when a size limit split it), built from the latest stable versions of its services. There is no revision number: a second build replaces the file, and a build that would produce exactly the content of the existing file (same checksums) leaves it alone. The alternative, numbered revisions with upgrade and downgrade rules at install, needed the app to decide what is newer and to reconcile two files of the same bundle. Leaving that to the person keeps the app simple: it shows what is installed and what the file holds, install skips an installed bundle, and an update is a reinstall: an uninstall followed by an install of the new file.
 
 ## Ubuntu packages resolved in a private apt root
 

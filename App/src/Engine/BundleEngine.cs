@@ -13,12 +13,15 @@ internal interface IBundleEngine
 
     /// <summary>
     /// Builds each bundle into the Bundles folder as <c>&lt;name&gt;.bundle</c>, replacing the file that is there. Everything is
-    /// downloaded in its latest stable version. A bundle whose file already holds exactly that is left as it is.
+    /// downloaded in its latest stable version. A bundle whose file already holds exactly that is left as it is, unless its files
+    /// are not laid out the way the size limit asks, in which case they are only cut up again (nothing is downloaded).
     /// </summary>
     /// <param name="names">The bundles; <c>all</c> means every bundle.</param>
+    /// <param name="partLimit">The most bytes one file may hold, or <see langword="null" /> for no limit. A bundle bigger than the limit is written as parts <c>&lt;name&gt;.bundle.001</c>, <c>.002</c> and so on of exactly the limit each, the last one holding the rest. At least 1 MB.</param>
     /// <param name="cancellation">Stops the build when cancelled (a model download continues next time).</param>
     /// <returns>A task that completes when all are built.</returns>
-    Task Build(IReadOnlyList<string> names, CancellationToken cancellation = default);
+    /// <exception cref="ArgumentOutOfRangeException">The limit is below 1 MB.</exception>
+    Task Build(IReadOnlyList<string> names, long? partLimit = null, CancellationToken cancellation = default);
 
     /// <summary>
     /// Installs each bundle from its file in the Bundles folder, after the bundles it needs. Needs administrator rights. A
@@ -60,20 +63,27 @@ internal interface IBundleEngine
 }
 
 /// <inheritdoc />
-internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, IBundleArchive archive, IStateStore states, IUsers users, IPaths paths, IMachine machine, ILog log) : IBundleEngine
+internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, IBundleArchive archive, IStateStore states, IUsers users, IPaths paths, IMachine machine, IByteSizes sizes, ILog log) : IBundleEngine
 {
+    private readonly long minimumPart = 1_000_000;
+
     /// <inheritdoc />
     public IReadOnlyList<BundleStatus> List()
         => catalog.All.Select(Status).ToList();
 
     /// <inheritdoc />
-    public async Task Build(IReadOnlyList<string> names, CancellationToken cancellation = default)
+    public async Task Build(IReadOnlyList<string> names, long? partLimit = null, CancellationToken cancellation = default)
     {
+        if (partLimit < minimumPart)
+        {
+            throw new ArgumentOutOfRangeException(nameof(partLimit), $"the size limit has to be at least {minimumPart / 1_000_000} MB");
+        }
+
         RequireLinux();
         List<IBundle> selected = [.. names.SelectMany(name => name == "all" ? catalog.All.Select(bundle => bundle.Name) : [name]).Distinct().Select(catalog.Get)];
         foreach (IBundle bundle in selected)
         {
-            await BuildOne(bundle, cancellation);
+            await BuildOne(bundle, partLimit, cancellation);
         }
     }
 
@@ -148,9 +158,13 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
 
     private void RequireFiles(IReadOnlyList<string> plan)
     {
-        foreach (string name in plan.Where(name => files.Find(name) is null))
+        foreach (string name in plan)
         {
-            throw new InvalidOperationException($"{name} is not built, so it cannot be installed. Build it on an online computer and put {name}.bundle in {paths.Bundles}.");
+            BundleFile file = files.Find(name) ?? throw new InvalidOperationException($"{name} is not built, so it cannot be installed. Build it on an online computer and put {name}.bundle (or all of its parts, {name}.bundle.001 and so on) in {paths.Bundles}.");
+            if (file.Problem is not null)
+            {
+                throw new InvalidOperationException($"{name} cannot be installed: {file.Problem}. Put all of its parts in {paths.Bundles}.");
+            }
         }
     }
 
@@ -194,7 +208,7 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
 
     private BundleStatus Status(IBundle bundle)
     {
-        string? file = files.Find(bundle.Name);
+        BundleFile? file = files.Find(bundle.Name);
         return new()
         {
             Name = bundle.Name,
@@ -202,19 +216,27 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
             Target = bundle.Target,
             Requires = bundle.Requires,
             State = states.Get(bundle.Name).IsInstalled ? BundleStanding.Installed : file is null ? BundleStanding.NotBuilt : BundleStanding.Available,
-            FileModified = file is null ? null : File.GetLastWriteTime(file),
+            FileModified = file?.Modified,
+            FileCount = file?.Paths.Count ?? 0,
+            FileProblem = file?.Problem,
         };
     }
 
-    private async Task BuildOne(IBundle bundle, CancellationToken cancellation)
+    private async Task BuildOne(IBundle bundle, long? partLimit, CancellationToken cancellation)
     {
-        string? existing = files.Find(bundle.Name);
+        BundleFile? existing = files.Find(bundle.Name);
+        if (existing?.Problem is not null)
+        {
+            log.Warn($"the files of {bundle.Name} in the Bundles folder cannot be used ({existing.Problem}), so it is built again");
+            existing = null;
+        }
+
         string staging = Path.Combine(paths.Staging, bundle.Name);
         log.Step($"Building {bundle.Name}: {bundle.Description}");
         IReadOnlyDictionary<string, string> known = existing is null ? new Dictionary<string, string>() : archive.ReadChecksums(existing);
         if (existing is not null && await bundle.IsUnchanged(known, cancellation))
         {
-            log.Info($"{bundle.Name} is up to date: {Path.GetFileName(existing)} already holds the latest versions, so it is left as it is");
+            await KeepOrCutUp(bundle, existing, partLimit, cancellation);
             return;
         }
 
@@ -237,33 +259,63 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
         if (existing is not null && checksums.Count == known.Count && checksums.All(pair => known.TryGetValue(pair.Key, out string? other) && other == pair.Value))
         {
             Directory.Delete(staging, recursive: true);
-            log.Info($"{bundle.Name} is up to date: {Path.GetFileName(existing)} already holds the latest versions, so it is left as it is");
+            await KeepOrCutUp(bundle, existing, partLimit, cancellation);
             return;
         }
 
-        string file = files.PathFor(bundle.Name);
-        log.Step($"Packing {Path.GetFileName(file)}");
-        await archive.Pack(
-            staging,
-            file,
-            new()
-            {
-                Name = bundle.Name,
-                Built = DateTimeOffset.Now.ToString("O"),
-                BuiltOn = BuiltOn(),
-                Components = result.Components,
-            },
-            checksums,
-            cancellation);
+        log.Step($"Packing {bundle.Name}.bundle{(partLimit is long limit ? $" (files of at most {sizes.Format(limit)})" : string.Empty)}");
+        BundleInfo info = new()
+        {
+            Name = bundle.Name,
+            Built = DateTimeOffset.Now.ToString("O"),
+            BuiltOn = BuiltOn(),
+            Components = result.Components,
+        };
+        BundleFile written = await files.Write(bundle.Name, partLimit, output => archive.Pack(staging, output, info, checksums, cancellation), cancellation);
         Directory.Delete(staging, recursive: true);
-        log.Step($"Built {bundle.Name}: {file} ({new FileInfo(file).Length / 1_000_000} MB)");
-        log.Info($"Copy it to the Bundles folder next to the app on the offline computer, then install {bundle.Name} there. A computer that has {bundle.Name} installed needs it reinstalled to use the new file.");
+        Report(written);
     }
+
+    private async Task KeepOrCutUp(IBundle bundle, BundleFile existing, long? partLimit, CancellationToken cancellation)
+    {
+        if (existing.Matches(partLimit))
+        {
+            log.Info($"{bundle.Name} is up to date: {Describe(existing)} already holds the latest versions, so it is left as it is");
+            return;
+        }
+
+        long free = new DriveInfo(paths.Bundles).AvailableFreeSpace;
+        if (free < existing.Length + 100_000_000)
+        {
+            throw new InvalidOperationException($"{bundle.Name} is up to date but its files are not laid out for the size limit, and there is not enough free space in {paths.Bundles} to cut it up again: {sizes.Format(free)} free, {sizes.Format(existing.Length + 100_000_000)} needed");
+        }
+
+        log.Step($"{bundle.Name} is up to date, cutting its files up again for the size limit (nothing is downloaded)");
+        BundleFile written = await files.Write(
+            bundle.Name,
+            partLimit,
+            async output =>
+            {
+                await using Stream input = files.OpenRead(existing);
+                await input.CopyToAsync(output, 1 << 20, cancellation);
+            },
+            cancellation);
+        Report(written);
+    }
+
+    private void Report(BundleFile written)
+    {
+        log.Step($"Built {written.Name}: {Describe(written)}");
+        log.Info($"Copy {(written.IsSplit ? "all its parts" : "it")} to the Bundles folder next to the app on the offline computer, then install {written.Name} there. A computer that has {written.Name} installed needs it reinstalled to use the new file{(written.IsSplit ? "s" : string.Empty)}.");
+    }
+
+    private string Describe(BundleFile file)
+        => file.IsSplit ? $"{file.Paths.Count} parts, {Path.GetFileName(file.Paths[0])} to {Path.GetFileName(file.Paths[^1])} ({sizes.Format(file.Length)})" : $"{Path.GetFileName(file.Paths[0])} ({sizes.Format(file.Length)})";
 
     private async Task InstallOne(IBundle bundle, CancellationToken cancellation)
     {
-        string file = files.Find(bundle.Name)!;
-        BundleInfo info = archive.ReadInfo(file) ?? throw new InvalidDataException($"{file} is not a readable bundle file");
+        BundleFile file = files.Find(bundle.Name)!;
+        BundleInfo info = archive.ReadInfo(file) ?? throw new InvalidDataException($"{Describe(file)} is not a readable bundle file");
         IBundleState state = states.Get(bundle.Name);
         if (state.IsInstalled)
         {
@@ -276,7 +328,7 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
             log.Warn($"{bundle.Name} is made for {bundle.Target} but this computer runs {system}: its Ubuntu packages may not fit, and the install may fail.");
         }
 
-        long size = new FileInfo(file).Length;
+        long size = file.Length;
         long free = new DriveInfo(paths.Unpack).AvailableFreeSpace;
         if (free < size + 500_000_000)
         {
@@ -292,7 +344,7 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
             IReadOnlyList<string> damaged = await archive.Verify(work, cancellation);
             if (damaged.Count > 0)
             {
-                throw new InvalidDataException($"{file} is damaged or incomplete ({damaged.Count} files do not match their checksum), copy it again");
+                throw new InvalidDataException($"{Describe(file)} is damaged or incomplete ({damaged.Count} files do not match their checksum), copy it again");
             }
 
             log.Step($"Installing {bundle.Name}");

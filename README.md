@@ -5,7 +5,7 @@
 [![Build](https://github.com/Blue-Heighliner/Bundler/actions/workflows/build.yml/badge.svg)](https://github.com/Blue-Heighliner/Bundler/actions/workflows/build.yml)
 ![Coverage](.github/badges/badge_linecoverage.svg)
 
-Bundler is a desktop app (and command line) that builds **bundles** on an online computer and installs, updates and removes them on an offline Ubuntu 24.04 computer. A bundle is one file (`git.bundle`, `dotnet.bundle`, ...) holding everything it needs: Ubuntu packages, binaries, VS Code extensions, NuGet packages, models. It is built with [Avalonia](https://avaloniaui.net/) on .NET 10 as a self-contained single-file executable; the third-party licenses it ships with are in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt). For internal use inside one organization only, see [Bundles.md](Bundles.md) for what each bundle installs and under which licenses.
+Bundler is a desktop app (and command line) that builds **bundles** on an online computer and installs, updates and removes them on an offline Ubuntu 24.04 computer. A bundle is one file (`git.bundle`, `dotnet.bundle`, ...; or numbered parts when built with a size limit) holding everything it needs: Ubuntu packages, binaries, VS Code extensions, NuGet packages, models. It is built with [Avalonia](https://avaloniaui.net/) on .NET 10 as a self-contained single-file executable; the third-party licenses it ships with are in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt). For internal use inside one organization only, see [Bundles.md](Bundles.md) for what each bundle installs and under which licenses.
 
 ## Requirements
 
