@@ -9,7 +9,7 @@ Bundler is a desktop app (and command line) that builds **bundles** on an online
 
 ## Requirements
 
-- Linux, x86-64, glibc based, to build or install bundles. Installing needs Ubuntu 24.04 (amd64) with the usual base system (`apt`, `tar`, `sudo` or `pkexec`) and free space in `/var/tmp` about the size of the bundle. The Windows build only shows the bundle list and explains that it cannot do the work. No separate .NET runtime install needed - the executable is self-contained.
+- Linux, x86-64, glibc based, to build or install bundles. Installing needs the Ubuntu 24.04.5 desktop (amd64, HWE kernel 7.0.0-31) that the installer USB drive installs, which is the system the bundles are built for, with the usual base system (`apt`, `tar`, `sudo` or `pkexec`) and free space in `/var/tmp` about the size of the bundle. The Windows build only shows the bundle list and explains that it cannot do the work. No separate .NET runtime install needed - the executable is self-contained.
 - To build: internet access, `apt-get`, `apt-cache` and `dpkg-deb` for bundles that use Ubuntu packages, and free disk space of about twice the bundle size (the `gemma` bundle is about 19 GB).
 
 ## Installing

@@ -2,8 +2,9 @@ namespace BlueHeighliner.Bundler;
 
 /// <summary>
 /// Collects Ubuntu packages for a bundle. A private apt root in the build cache (no root rights needed) is pointed at the
-/// Ubuntu 24.04 archive whatever Ubuntu the build computer runs; it works out which <c>.deb</c> files the packages need on a fresh
-/// 24.04 system and downloads them into a small local repository that the install uses without any network.
+/// Ubuntu 24.04 archive whatever Ubuntu the build computer runs, with the packages of the target system (<see cref="ITargetSystem" />) as
+/// its installed state. It works out which <c>.deb</c> files the packages need on exactly that system and downloads them into a small local
+/// repository that the install uses without any network.
 /// </summary>
 internal interface IAptBuilder
 {
@@ -60,21 +61,30 @@ internal interface IAptBuilder
     Task<IReadOnlyList<string>> FindAll(string pattern, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Downloads the packages and everything they need that a fresh Ubuntu 24.04 does not have, and writes the repository
-    /// index. Essential and required packages are left out, but only at the version 24.04 was released with: once such a
-    /// package has been updated, a computer without the update could not satisfy an exact version requirement (perl needs
-    /// perl-base at its own version), so the updated one is included. The names of the services and support packages are
-    /// written to <c>top-level.txt</c> and <c>support.txt</c>.
+    /// Works out which packages installing some packages on the target system would add or upgrade, without downloading anything.
+    /// </summary>
+    /// <param name="packages">The packages to install.</param>
+    /// <param name="cancellation">Stops the work when cancelled.</param>
+    /// <returns>The names of the packages that would be installed, or <see langword="null" /> when the packages cannot be installed together or installing them would remove a package of the target.</returns>
+    Task<IReadOnlyList<string>?> Plan(IReadOnlyList<string> packages, CancellationToken cancellation = default);
+
+    /// <summary>
+    /// Downloads the packages and everything they need that the target system does not have (including the newer versions
+    /// of packages it has that they require), and writes the repository index. The services are always included, even when the
+    /// target already has them at that version. Support packages the target has installed are left out, because an install only
+    /// adds support packages that are missing. The names of the services and support packages are written to
+    /// <c>top-level.txt</c> and <c>support.txt</c>.
     /// </summary>
     /// <param name="directory">The folder that becomes the bundle's repository.</param>
     /// <param name="request">The packages.</param>
     /// <param name="cancellation">Stops the work when cancelled.</param>
     /// <returns>Every package in the folder.</returns>
+    /// <exception cref="InvalidOperationException">apt cannot resolve the packages, or installing them would remove a package of the target.</exception>
     Task<IReadOnlyList<DebPackage>> Download(string directory, AptRequest request, CancellationToken cancellation = default);
 }
 
 /// <inheritdoc />
-internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IHttpFetcher http, IDebIndex index, IVersions versions, ILog log) : IAptBuilder
+internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IHttpFetcher http, IDebIndex index, IVersions versions, ITargetSystem target, ILog log) : IAptBuilder
 {
     private static readonly string keyring = "/usr/share/keyrings/ubuntu-archive-keyring.gpg";
 
@@ -97,7 +107,7 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
             Directory.CreateDirectory(Path.Combine(Root, folder));
         }
 
-        await File.WriteAllTextAsync(Path.Combine(Root, "status"), string.Empty, cancellation);
+        await File.WriteAllTextAsync(Path.Combine(Root, "status"), target.PackageStatus, cancellation);
         IEnumerable<string> ubuntu = new[] { Release, Release + "-updates", Release + "-security" }
             .Select(pocket => $"deb [arch=amd64 signed-by={keyring}] {Mirror} {pocket} main restricted universe multiverse");
         await File.WriteAllLinesAsync(Path.Combine(Root, "sources.list"), ubuntu.Concat(extraSources), cancellation);
@@ -141,13 +151,22 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<string>?> Plan(IReadOnlyList<string> packages, CancellationToken cancellation = default)
+    {
+        ProcessResult simulation = await runner.Run(new() { FileName = "apt-get", Arguments = [.. Options, "-s", "-qq", "install", .. packages], Check = false }, cancellation);
+        return simulation.Success && !RemovePattern().IsMatch(simulation.Output)
+            ? [.. PlanPattern().Matches(simulation.Output).Select(match => match.Groups["name"].Value.Replace(":amd64", string.Empty))]
+            : null;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<DebPackage>> Download(string directory, AptRequest request, CancellationToken cancellation = default)
     {
         Directory.CreateDirectory(directory);
         List<string> arguments = [];
         List<string> localNames = [];
         Dictionary<string, string> names = [];
-        foreach (string package in request.Services.Concat(request.Support))
+        foreach (string package in request.Services.Concat(request.Support.Where(support => !target.IsInstalled(support))))
         {
             if (package.EndsWith(".deb", StringComparison.Ordinal))
             {
@@ -163,35 +182,31 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
             }
         }
 
-        log.Step($"Working out the packages needed on a fresh Ubuntu {Release}: {string.Join(' ', request.Services.Concat(request.Support).Select(Path.GetFileName))}");
+        log.Step($"Working out the packages the target system needs: {string.Join(' ', arguments.Select(Path.GetFileName))}");
         ProcessResult simulation = await runner.Run(new() { FileName = "apt-get", Arguments = [.. Options, "-s", "-qq", "install", .. arguments], Check = false }, cancellation);
-        List<(string Name, string Version)> plan = PlanPattern().Matches(simulation.Output)
-            .Select(match => (match.Groups["name"].Value.Replace(":amd64", string.Empty), match.Groups["version"].Value)).ToList();
-        if (plan.Count == 0)
+        if (!simulation.Success)
         {
             throw new InvalidOperationException($"apt could not resolve: {string.Join(' ', arguments)}\n{simulation.Error.Trim()}");
         }
 
-        HashSet<string> baseSystem = await BaseSystem(plan.Select(item => item.Name), cancellation);
-        Dictionary<string, string> releaseVersions = await ReleaseVersions(plan.Select(item => item.Name).Except(localNames), cancellation);
-        HashSet<string> serviceNames = [.. request.Services.Select(package => names[package])];
-        HashSet<(string Name, string Version)> extras = [];
-        foreach ((string name, string version) in plan)
+        string[] removals = [.. RemovePattern().Matches(simulation.Output).Select(match => match.Groups["name"].Value.Replace(":amd64", string.Empty))];
+        if (removals.Length > 0)
         {
-            bool isRelease = releaseVersions.TryGetValue(name, out string? released) && released == version;
-            if ((baseSystem.Contains(name) && isRelease) || localNames.Contains(name))
-            {
-                continue;
-            }
+            throw new InvalidOperationException($"installing {string.Join(' ', arguments.Select(Path.GetFileName))} on the target system would remove {string.Join(' ', removals)}");
+        }
 
+        List<(string Name, string Version)> plan = [.. PlanPattern().Matches(simulation.Output).Select(match => (match.Groups["name"].Value.Replace(":amd64", string.Empty), match.Groups["version"].Value))];
+        HashSet<string> serviceNames = [.. request.Services.Select(package => names[package])];
+        foreach ((string name, string version) in plan.Where(item => !localNames.Contains(item.Name)))
+        {
             log.Info($"{name} {version}");
             await runner.Run(new() { FileName = "apt-get", Arguments = [.. Options, "-qq", "download", $"{name}={version}"], WorkingDirectory = directory }, cancellation);
-            if (!isRelease && released is not null && !baseSystem.Contains(name) && !serviceNames.Contains(name))
-            {
-                log.Info($"{name} {released} (the release version, for a computer that has not updated it)");
-                await runner.Run(new() { FileName = "apt-get", Arguments = [.. Options, "-qq", "download", $"{name}={released}"], WorkingDirectory = directory }, cancellation);
-                extras.Add((name, released));
-            }
+        }
+
+        foreach (string service in serviceNames.Except(localNames).Where(name => plan.TrueForAll(item => item.Name != name)))
+        {
+            log.Info($"{service} (the target system has it already)");
+            await runner.Run(new() { FileName = "apt-get", Arguments = [.. Options, "-qq", "download", service], WorkingDirectory = directory }, cancellation);
         }
 
         foreach (string file in Directory.EnumerateFiles(directory, "*%3a*.deb"))
@@ -200,12 +215,15 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
         }
 
         await File.WriteAllLinesAsync(Path.Combine(directory, "top-level.txt"), request.Services.Select(package => names[package]), cancellation);
-        await File.WriteAllLinesAsync(Path.Combine(directory, "support.txt"), request.Support.Select(package => names[package]), cancellation);
-        return [.. (await index.Write(directory, cancellation)).Where(package => !extras.Contains((package.Package, package.Version)))];
+        await File.WriteAllLinesAsync(Path.Combine(directory, "support.txt"), request.Support.Where(names.ContainsKey).Select(package => names[package]), cancellation);
+        return await index.Write(directory, cancellation);
     }
 
-    [GeneratedRegex(@"^Inst (?<name>\S+) \((?<version>\S+) ", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^Inst (?<name>\S+) (?:\[\S+\] )?\((?<version>\S+) ", RegexOptions.Multiline)]
     private static partial Regex PlanPattern();
+
+    [GeneratedRegex(@"^Remv (?<name>\S+)", RegexOptions.Multiline)]
+    private static partial Regex RemovePattern();
 
     private IReadOnlyList<string> Options
         =>
@@ -224,48 +242,5 @@ internal sealed partial class AptBuilder(IPaths paths, IProcessRunner runner, IH
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, await http.GetString(url, cancellation: cancellation), cancellation);
         return path;
-    }
-
-    private async Task<HashSet<string>> BaseSystem(IEnumerable<string> names, CancellationToken cancellation)
-    {
-        ProcessResult shown = await runner.Run(new() { FileName = "apt-cache", Arguments = [.. Options, "show", "--no-all-versions", .. names], Check = false }, cancellation);
-        HashSet<string> baseSystem = [];
-        foreach (string paragraph in shown.Output.Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (index.Field(paragraph, "Essential") == "yes" || index.Field(paragraph, "Priority") == "required")
-            {
-                baseSystem.Add(index.Field(paragraph, "Package"));
-            }
-        }
-
-        return baseSystem;
-    }
-
-    private async Task<Dictionary<string, string>> ReleaseVersions(IEnumerable<string> names, CancellationToken cancellation)
-    {
-        Dictionary<string, string> released = [];
-        string[] wanted = [.. names.Distinct()];
-        if (wanted.Length == 0)
-        {
-            return released;
-        }
-
-        ProcessResult madison = await runner.Run(new() { FileName = "apt-cache", Arguments = [.. Options, "madison", .. wanted], Check = false }, cancellation);
-        foreach (string line in madison.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-        {
-            string[] fields = line.Split('|');
-            string[] source = fields.Length >= 3 ? fields[2].Trim().Split(' ') : [];
-            if (source.Length >= 2 && source[1].StartsWith(Release + "/", StringComparison.Ordinal))
-            {
-                string name = fields[0].Trim();
-                string version = fields[1].Trim();
-                if (!released.TryGetValue(name, out string? known) || versions.CompareDebian(version, known) > 0)
-                {
-                    released[name] = version;
-                }
-            }
-        }
-
-        return released;
     }
 }

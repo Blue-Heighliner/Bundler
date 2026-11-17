@@ -39,7 +39,7 @@
 
 ## Bundles and licensing
 
-- Bundler builds bundles on an online computer and installs them on an offline Ubuntu 24.04 computer, for internal use inside one organization only: nothing a bundle installs is redistributed to another organization or person. Licenses are judged against that scope. Terms that only restrict redistribution (Microsoft's VS Code and C# extension sharing ban, Git Graph's ban on distributing derivative works, the GPL source offer) do not block a component but are recorded in `Bundles.md`. If a bundle is ever to leave the organization, redo the review first.
+- Bundler builds bundles on an online computer and installs them on an offline Ubuntu 24.04 computer (exactly the system the installer USB drive installs: 24.04.5 desktop with HWE kernel 7.0.0-31, whose package list is embedded in the app), for internal use inside one organization only: nothing a bundle installs is redistributed to another organization or person. Licenses are judged against that scope. Terms that only restrict redistribution (Microsoft's VS Code and C# extension sharing ban, Git Graph's ban on distributing derivative works, the GPL source offer) do not block a component but are recorded in `Bundles.md`. If a bundle is ever to leave the organization, redo the review first.
 - Everything a bundle installs must be licensed for commercial and government use, and models come from US organizations only. When adding, upgrading or replacing any component (deb package, binary download, VS Code extension, NuGet package, model):
   1. Read the primary license text (the package's `copyright` file, `LICENSE`, `ollama show --license`, the `.nuspec` and the license file inside the package), not a summary or an SPDX tag alone.
   2. Reject anything non-commercial, research-only, evaluation-only, field-of-use restricted, requiring a paid key (for example AvaloniaUI's Developer Tools and TreeDataGrid) or with no stated license. A component whose restrictions the scope cannot meet is not shipped.
@@ -50,7 +50,7 @@
 - Installs compare every component with what is on the computer (missing: install, older: replace, same: skip, newer: keep; NuGet packages are only added) and an uninstall removes only what the bundle itself installed.
 - On Linux the app always runs as root (it starts itself again through sudo or pkexec when it is not), so its cache and install records are always in root's app data folder, `BlueHeighliner.Bundler`, and the bundles are in `Bundles` next to the executable. The app reads no environment variables as settings (only the display variables it forwards to the root copy).
 - No em dash character in any text, comment or document.
-- Test the window with `xvfb` on a virtual display only. Try installs in a throwaway chroot (`Scripts/Chroot.cs`) under `/var/tmp`, never on the real system.
+- Test the window with `xvfb` on a virtual display only. Try installs in a throwaway chroot (`Scripts/Chroot.cs`) under `/var/tmp`, never on the real system, and verify bundles on a replica of that system (`Scripts/UsbTarget.cs`; run its `status` to refresh the embedded package list whenever the drive changes).
 
 ## Verification
 

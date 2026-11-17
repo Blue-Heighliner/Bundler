@@ -13,6 +13,8 @@
 //
 // BUNDLER_TEST_PUBLISH is the folder `dotnet publish App/App.csproj -r linux-x64 -o <folder>` wrote (default /tmp/bundler-publish).
 // BUNDLER_TEST_RELEASE is the Ubuntu release `create` builds the chroot from (default noble, 24.04).
+// BUNDLER_TEST_ROOT is the chroot folder (default /var/tmp/bundler-test/rootfs, always under /var/tmp or /tmp): use /var/tmp/usb-target/work, which
+// `dotnet run Scripts/UsbTarget.cs reset` makes, to test on the system the installer USB drive installs.
 // BUNDLER_TEST_NONET=1 runs commands without any network, like the real target.
 
 using Markwardt.ScriptUtilities;

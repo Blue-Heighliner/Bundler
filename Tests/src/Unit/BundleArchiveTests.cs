@@ -1,5 +1,3 @@
-using System.Formats.Tar;
-
 namespace BlueHeighliner.Bundler.Tests;
 
 public sealed class BundleArchiveTests : IDisposable

@@ -5,20 +5,24 @@ public sealed class A2000BundleTests : IDisposable
     private readonly TempDirectory directory = new();
     private readonly Mock<IReleaseSources> sources = new();
     private readonly Mock<IAptBuilder> apt = new();
+    private readonly Mock<ITargetSystem> target = new();
     private readonly List<string> requested = [];
     private readonly A2000Bundle bundle;
 
     public A2000BundleTests()
     {
         apt.Setup(a => a.FindAll(@"nvidia-driver-[0-9]+-open", It.IsAny<CancellationToken>())).ReturnsAsync(["nvidia-driver-570-open", "nvidia-driver-580-open", "nvidia-driver-595-open"]);
+        target.SetupGet(t => t.Kernel).Returns("7.0.0-31-generic");
         apt.Setup(a => a.Exists(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        apt.Setup(a => a.Plan(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<string> packages, CancellationToken _) =>
+            (IReadOnlyList<string>?)[.. packages, "nvidia-kernel-common-" + packages[0].Split('-')[2], "libnvidia-gl-" + packages[0].Split('-')[2], "libnvidia-egl-wayland1", "dkms"]);
         apt.Setup(a => a.Download(It.IsAny<string>(), It.IsAny<AptRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync((string _, AptRequest request, CancellationToken _) =>
         {
             requested.AddRange(request.Services);
-            return (IReadOnlyList<DebPackage>)[.. request.Services.Select(name => new DebPackage(name, name.StartsWith("nvidia-driver", StringComparison.Ordinal) ? "595.99.02-0ubuntu0.24.04.1" : "6.8.0-149.149", name + ".deb"))];
+            return (IReadOnlyList<DebPackage>)[.. request.Services.Select(name => new DebPackage(name, name.StartsWith("nvidia-driver", StringComparison.Ordinal) ? "595.99.02-0ubuntu0.24.04.1" : "7.0.0-31.31~24.04.1+1", name + ".deb"))];
         });
         Directory.CreateDirectory(directory.Combine("staging"));
-        bundle = new(sources.Object, apt.Object, Mock.Of<IAptInstaller>(), Mock.Of<IDecisions>(), Mock.Of<IProcessRunner>(), new Versions(), Mock.Of<ILog>());
+        bundle = new(sources.Object, apt.Object, Mock.Of<IAptInstaller>(), Mock.Of<IDecisions>(), Mock.Of<IProcessRunner>(), new Versions(), target.Object, Mock.Of<ILog>());
     }
 
     public void Dispose()
@@ -31,9 +35,10 @@ public sealed class A2000BundleTests : IDisposable
 
         BuildResult result = await bundle.Build(directory.Combine("staging"));
 
-        Assert.Equal(["nvidia-driver-595-open", "linux-modules-nvidia-595-open-generic"], requested);
+        Assert.Equal(["nvidia-driver-595-open", "linux-modules-nvidia-595-open-7.0.0-31-generic"], requested);
         Assert.Equal("595.99.02", File.ReadAllText(directory.Combine("staging", "version.txt")));
         Assert.StartsWith("NVIDIA driver 595.99.02", result.Components[0]);
+        Assert.Contains("prebuilt for kernel 7.0.0-31-generic", result.Components[1]);
     }
 
     [Fact]
@@ -50,11 +55,46 @@ public sealed class A2000BundleTests : IDisposable
     public async Task Build_SeriesWithoutPrebuiltModules_FallsBackToTheNextOne()
     {
         sources.Setup(s => s.LatestNvidiaDriver(It.IsAny<CancellationToken>())).ReturnsAsync("620.70.06");
-        apt.Setup(a => a.Exists("linux-modules-nvidia-595-open-generic", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        apt.Setup(a => a.Exists("linux-modules-nvidia-595-open-7.0.0-31-generic", It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         await bundle.Build(directory.Combine("staging"));
 
         Assert.Equal("nvidia-driver-580-open", requested[0]);
+    }
+
+    [Fact]
+    public async Task Build_SeriesWhosePlanMixesInAnotherSeries_FallsBackToTheNextOne()
+    {
+        sources.Setup(s => s.LatestNvidiaDriver(It.IsAny<CancellationToken>())).ReturnsAsync("620.70.06");
+        apt.Setup(a => a.Plan(It.Is<IReadOnlyList<string>>(packages => packages[0] == "nvidia-driver-595-open"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["nvidia-driver-595-open", "linux-modules-nvidia-595-open-7.0.0-31-generic", "nvidia-kernel-common-615", "libnvidia-gl-615"]);
+
+        await bundle.Build(directory.Combine("staging"));
+
+        Assert.Equal("nvidia-driver-580-open", requested[0]);
+    }
+
+    [Fact]
+    public async Task Build_SeriesThatCannotBeInstalled_FallsBackToTheNextOne()
+    {
+        sources.Setup(s => s.LatestNvidiaDriver(It.IsAny<CancellationToken>())).ReturnsAsync("620.70.06");
+        apt.Setup(a => a.Plan(It.Is<IReadOnlyList<string>>(packages => packages[0] == "nvidia-driver-595-open"), It.IsAny<CancellationToken>())).ReturnsAsync((IReadOnlyList<string>?)null);
+
+        await bundle.Build(directory.Combine("staging"));
+
+        Assert.Equal("nvidia-driver-580-open", requested[0]);
+        Assert.Equal("linux-modules-nvidia-580-open-7.0.0-31-generic", requested[1]);
+    }
+
+    [Fact]
+    public async Task Build_AnotherTargetKernel_AsksForThatKernelsModules()
+    {
+        sources.Setup(s => s.LatestNvidiaDriver(It.IsAny<CancellationToken>())).ReturnsAsync("620.70.06");
+        target.SetupGet(t => t.Kernel).Returns("6.8.0-149-generic");
+
+        await bundle.Build(directory.Combine("staging"));
+
+        Assert.Equal("linux-modules-nvidia-595-open-6.8.0-149-generic", requested[1]);
     }
 
     [Fact]
@@ -72,9 +112,9 @@ public sealed class A2000BundleTests : IDisposable
         Mock<ILog> log = new();
         Mock<IProcessRunner> runner = new();
         runner.Setup(r => r.Run(It.IsAny<ProcessCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new ProcessResult(1, string.Empty, string.Empty));
-        A2000Bundle installing = new(sources.Object, apt.Object, Mock.Of<IAptInstaller>(), Mock.Of<IDecisions>(), runner.Object, new Versions(), log.Object);
+        A2000Bundle installing = new(sources.Object, apt.Object, Mock.Of<IAptInstaller>(), Mock.Of<IDecisions>(), runner.Object, new Versions(), target.Object, log.Object);
 
-        await installing.Install(new() { Payload = directory.Combine("payload"), State = new BundleState(directory.Combine("state")), Users = [], Info = new() { Name = "a2000", Components = ["NVIDIA driver 595.99.02 (nvidia-driver-595-open)", "linux-modules-nvidia-595-open-generic 6.8.0-149.149"] } });
+        await installing.Install(new() { Payload = directory.Combine("payload"), State = new BundleState(directory.Combine("state")), Users = [], Info = new() { Name = "a2000", Components = ["NVIDIA driver 595.99.02 (nvidia-driver-595-open)", "linux-modules-nvidia-595-open-6.8.0-149-generic 6.8.0-149.149 (prebuilt for kernel 6.8.0-149-generic)"] } });
 
         log.Verify(l => l.Write(LogLevel.Warning, It.Is<string>(text => text.Contains("kernel 6.8.0-149-generic") && text.Contains("boot menu"))), Times.Once);
     }
@@ -89,7 +129,7 @@ public sealed class A2000BundleTests : IDisposable
         Mock<IDecisions> decisions = new();
         decisions.Setup(d => d.Install(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>())).Returns(true);
         directory.Write("payload/version.txt", "615.71.09");
-        return (new(sources.Object, apt.Object, installer.Object, decisions.Object, runner.Object, new Versions(), Mock.Of<ILog>()), installer, decisions);
+        return (new(sources.Object, apt.Object, installer.Object, decisions.Object, runner.Object, new Versions(), target.Object, Mock.Of<ILog>()), installer, decisions);
     }
 
     private InstallContext Context()

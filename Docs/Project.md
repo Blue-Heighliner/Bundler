@@ -8,7 +8,8 @@ Documentation for this repository's own tooling and workflow.
 
 - `Scripts/Publish.cs` - cuts a release (see Publishing below). A manual, human-only action.
 - `Scripts/Run.cs` - runs the app locally with `dotnet run`, using the repository's `Bundles/` folder (`--bundles`).
-- `Scripts/Chroot.cs` - test harness that installs bundles with the published executable inside a throwaway Ubuntu 24.04 chroot under `/var/tmp` (`create`, `sync`, `run`, `user`, `destroy`; `sync` links (or copies, across disks) the repository's `Bundles/` files into `/srv/bundler/bundles` in the chroot, next to the app). Needs `sudo` and `mmdebstrap`; nothing it does as root leaves the chroot folder.
+- `Scripts/UsbTarget.cs` - rebuilds the system the installer USB drive installs (for testing bundles on exactly the target, in `/var/tmp/usb-target`) and refreshes the package list built into the app.
+- `Scripts/Chroot.cs` - test harness that installs bundles with the published executable inside a throwaway Ubuntu 24.04 chroot under `/var/tmp` (`create`, `sync`, `run`, `user`, `destroy`; `sync` links (or copies, across disks) the repository's `Bundles/` files into `/srv/bundler/Bundles` in the chroot, next to the app). `create` makes a plain 24.04 chroot; to test on the target system instead, point `BUNDLER_TEST_ROOT` at the copy `UsbTarget.cs reset` makes. Needs `sudo` and `mmdebstrap`; nothing it does as root leaves the chroot folder.
 
 ## Publishing
 

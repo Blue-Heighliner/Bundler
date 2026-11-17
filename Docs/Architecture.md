@@ -18,7 +18,7 @@ A bundle is the file `<name>.bundle` (or its numbered parts when a size limit sp
 
 ## Ubuntu packages resolved in a private apt root
 
-Packages are resolved against the Ubuntu 24.04 archive in a private apt root in the cache, so a build works from any Linux host and not only from 24.04. The build computes the closure of what a fresh 24.04 needs (leaving out Essential and required packages unless the archive has a newer version than the release), downloads the `.deb` files and indexes them as a flat local repository. Installing points apt at that folder only, so it works with no network and with apt's own dependency solver.
+Packages are resolved against the Ubuntu 24.04 archive in a private apt root in the cache, so a build works from any Linux host and not only from 24.04. Its installed state is the package list of the one target system, the Ubuntu the installer USB drive installs (24.04.5 desktop, kernel 7.0.0-31-generic), built into the app: the build computes exactly what that system lacks, so nothing guessed from a bare release can conflict with the desktop that is really there (a bundle built against a fresh 24.04 could not install krita on it without removing evince and nautilus). The build refuses a bundle whose install would remove a package of the target. It downloads the `.deb` files and indexes them as a flat local repository. Installing points apt at that folder only, so it works with no network and with apt's own dependency solver.
 
 ## NuGet mirrored with a real restore
 

@@ -1,5 +1,3 @@
-using System.IO.Compression;
-
 namespace BlueHeighliner.Bundler.Tests;
 
 public sealed class NuGetLicensesTests

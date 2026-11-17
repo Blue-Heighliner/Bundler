@@ -20,6 +20,7 @@ internal static class ServiceCollectionExtensions
             services.AddSingleton<IMachine, Machine>();
             services.AddSingleton<IPaths>(provider => new Paths(provider.GetRequiredService<IMachine>(), bundlesDirectory));
             services.AddSingleton<IResources, Resources>();
+            services.AddSingleton<ITargetSystem, TargetSystem>();
             services.AddSingleton<IHashing, Hashing>();
             services.AddSingleton<IVersions, Versions>();
             services.AddSingleton<IDecisions, Decisions>();
