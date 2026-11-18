@@ -36,3 +36,7 @@ Tmds.DBus.Protocol
 ?FluentAvaloniaUI
 ?Semi.Avalonia
 ?DialogHost.Avalonia
+
+# xunit v3 3.x and its VSTest adapter: Avalonia.Headless.XUnit needs the 3.x line and fails at test discovery with the 4.x one that the xunit bundle brings
+xunit.v3@3.*
+xunit.runner.visualstudio@3.*
