@@ -34,6 +34,8 @@ public sealed class AutoRemoteBundleTests : IDisposable
         files.SetupGet(f => f.VersionFile).Returns(directory.Combine("opt", "version.txt"));
         files.SetupGet(f => f.UnitText).Returns("UNIT\n");
         files.SetupGet(f => f.DesktopEntryText).Returns("ENTRY\n");
+        files.SetupGet(f => f.EnvironmentText).Returns("ENVIRONMENT\n");
+        files.SetupGet(f => f.LocalModel).Returns("model:1b");
         files.Setup(f => f.PortFor(It.IsAny<int>())).Returns((int position) => real.PortFor(position));
         files.Setup(f => f.ConfigText(It.IsAny<string>(), It.IsAny<int?>())).Returns((string key, int? port) => real.ConfigText(key, port));
         files.Setup(f => f.NewKey()).Returns("NEWKEY");
@@ -300,5 +302,30 @@ public sealed class AutoRemoteBundleTests : IDisposable
 
         Assert.Equal("NEWKEY", JsonNode.Parse(File.ReadAllText(Home("alice", ".config", "auto-remote", "config.json")))!["key"]!.GetValue<string>());
         Assert.Equal("UNIT\n", File.ReadAllText(Home("alice", ".config", "systemd", "user", "auto-remote.service")));
+    }
+
+    [Fact]
+    public async Task Install_GivesEachAccountTheAiEnvironmentWithItsDataFolderOwnedByThemAndPrivate()
+    {
+        await bundle.Install(Install("alice", "bob"));
+
+        foreach (string account in new[] { "alice", "bob" })
+        {
+            string path = Home(account, ".local", "share", "AutoRemote", "environment.json");
+            Assert.Equal("ENVIRONMENT\n", File.ReadAllText(path));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
+            userFiles.Verify(u => u.Write(account, path, "ENVIRONMENT\n", It.IsAny<CancellationToken>()), Times.Once);
+        }
+    }
+
+    [Fact]
+    public async Task Install_AnAiEnvironmentThatIsThereAlready_IsKept()
+    {
+        directory.Write("home/alice/.local/share/AutoRemote/environment.json", "{ \"defaultService\": \"ClaudeCode\" }");
+
+        await bundle.Install(Install("alice"));
+
+        Assert.Equal("{ \"defaultService\": \"ClaudeCode\" }", File.ReadAllText(Home("alice", ".local", "share", "AutoRemote", "environment.json")));
+        log.Verify(l => l.Write(LogLevel.Info, It.Is<string>(text => text.Contains("environment.json exists"))), Times.Once);
     }
 }

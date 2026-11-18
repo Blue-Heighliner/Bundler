@@ -24,7 +24,7 @@ internal interface IMainViewModel : INotifyPropertyChanged
     string Notice { get; }
 
     /// <summary>
-    /// Gets or sets the size limit for the files of a build, as typed (for example <c>4.7G</c>, <c>700M</c> or <c>4700000000</c>); empty
+    /// Gets or sets the size limit for the files of a build, as typed (for example <c>4G</c>, <c>700M</c> or <c>4000000000</c>); empty
     /// means no limit. A bundle bigger than the limit is built in parts of exactly that size.
     /// </summary>
     string MaxSize { get; set; }

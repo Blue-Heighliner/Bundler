@@ -55,12 +55,12 @@ public sealed class ReleaseSourcesTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => sources.LatestBlender());
     }
 
-    private static JsonNode Release(bool draft = false)
+    private static JsonNode Release(bool draft = false, bool prerelease = false)
         => JsonNode.Parse($$"""
             {
               "tag_name": "1.2.0",
               "draft": {{(draft ? "true" : "false")}},
-              "prerelease": false,
+              "prerelease": {{(prerelease ? "true" : "false")}},
               "assets": [
                 { "name": "AutoRemote-linux", "browser_download_url": "https://example.com/client", "digest": "sha256:aaaa" },
                 { "name": "AutoRemote-Server-linux", "browser_download_url": "https://example.com/server", "digest": "sha256:bbbb" },
@@ -70,11 +70,11 @@ public sealed class ReleaseSourcesTests
             """)!;
 
     [Fact]
-    public async Task GitHubTag_ReturnsTheAssetsInTheOrderOfThePatterns()
+    public async Task LatestGitHub_ReturnsTheAssetsInTheOrderOfThePatterns()
     {
-        http.Setup(h => h.GetJson("https://api.github.com/repos/o/r/releases/tags/1.2.0", null, It.IsAny<CancellationToken>())).ReturnsAsync(Release());
+        http.Setup(h => h.GetJson("https://api.github.com/repos/o/r/releases/latest", null, It.IsAny<CancellationToken>())).ReturnsAsync(Release());
 
-        GitHubRelease release = await sources.GitHubTag("o/r", "1.2.0", ["^AutoRemote-Server-linux$", "^AutoRemote-linux$"]);
+        GitHubRelease release = await sources.LatestGitHub("o/r", ["^AutoRemote-Server-linux$", "^AutoRemote-linux$"]);
 
         Assert.Equal("1.2.0", release.Tag);
         Assert.Equal(["AutoRemote-Server-linux", "AutoRemote-linux"], release.Assets.Select(asset => asset.FileName));
@@ -84,21 +84,23 @@ public sealed class ReleaseSourcesTests
     }
 
     [Fact]
-    public async Task GitHubTag_MissingAsset_Throws()
+    public async Task LatestGitHub_MissingAsset_Throws()
     {
         http.Setup(h => h.GetJson(It.IsAny<string>(), null, It.IsAny<CancellationToken>())).ReturnsAsync(Release());
 
-        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => sources.GitHubTag("o/r", "1.2.0", ["^nothing$"]));
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => sources.LatestGitHub("o/r", ["^nothing$"]));
 
         Assert.Contains("no asset matches", error.Message);
     }
 
-    [Fact]
-    public async Task GitHubTag_Draft_Throws()
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task LatestGitHub_DraftOrPrerelease_Throws(bool draft, bool prerelease)
     {
-        http.Setup(h => h.GetJson(It.IsAny<string>(), null, It.IsAny<CancellationToken>())).ReturnsAsync(Release(draft: true));
+        http.Setup(h => h.GetJson(It.IsAny<string>(), null, It.IsAny<CancellationToken>())).ReturnsAsync(Release(draft, prerelease));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => sources.GitHubTag("o/r", "1.2.0", ["^AutoRemote-linux$"]));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sources.LatestGitHub("o/r", ["^AutoRemote-linux$"]));
     }
 
     private static JsonNode Releases(params (string Tag, bool Prerelease, bool Draft)[] releases)

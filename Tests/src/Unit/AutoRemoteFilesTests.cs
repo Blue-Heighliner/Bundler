@@ -10,7 +10,7 @@ public sealed class AutoRemoteFilesTests
         string unit = files.UnitText;
 
         Assert.Contains("Description=Auto-Remote server", unit);
-        Assert.Contains("After=network-online.target", unit);
+        Assert.DoesNotContain("network-online", unit);
         Assert.Contains("ExecStart=/opt/auto-remote/server/Markwardt.AutoRemote.Server %h/.config/auto-remote/config.json", unit);
         Assert.Contains("WorkingDirectory=%h", unit);
         Assert.Contains("Restart=on-failure", unit);
@@ -73,5 +73,22 @@ public sealed class AutoRemoteFilesTests
             Assert.Equal(32, key.Length);
             Assert.Matches("^[A-Za-z0-9_-]+$", key);
         });
+    }
+
+    [Fact]
+    public void EnvironmentText_MakesNewWorkspacesRunOnTheLocalModelForEveryCapability()
+    {
+        JsonNode environment = JsonNode.Parse(files.EnvironmentText)!;
+
+        Assert.StartsWith("{\n  \"version\": 1,", files.EnvironmentText);
+        Assert.Equal("Local", environment["defaultService"]!.GetValue<string>());
+        Assert.Equal("gemma4:26b", files.LocalModel);
+        foreach (string capability in new[] { "fast", "balanced", "strong", "max" })
+        {
+            Assert.Equal("gemma4:26b", environment["localModels"]![capability]!.GetValue<string>());
+            Assert.Equal(16384, environment["localContexts"]![capability]!.GetValue<int>());
+        }
+
+        Assert.EndsWith("\n", files.EnvironmentText);
     }
 }

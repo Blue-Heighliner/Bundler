@@ -35,7 +35,7 @@ internal sealed class CommandLine(IBundleEngine engine, IByteSizes sizes, ILog l
 
             Options: -y, --yes        do not ask for confirmation
                      --bundles PATH   use this folder for the bundle files instead of "Bundles" next to the app
-                     --max-size SIZE  build: no bundle file gets bigger than SIZE (4700000000, 4.7G, 700M, 4GiB; at least 1M); a bigger
+                     --max-size SIZE  build: no bundle file gets bigger than SIZE (4000000000, 4G, 700M, 4GiB; at least 1M); a bigger
                                       bundle is cut into parts of exactly SIZE, the last one holding the rest. Installs read the
                                       parts of a bundle in the Bundles folder like one file.
 
@@ -60,7 +60,7 @@ internal sealed class CommandLine(IBundleEngine engine, IByteSizes sizes, ILog l
                     string? value = sizeOption == "--max-size" ? (index + 1 < arguments.Count ? arguments[++index] : null) : sizeOption["--max-size=".Length..];
                     try
                     {
-                        maxSize = sizes.Parse(value) ?? throw new FormatException("--max-size needs a size (examples: 4700000000, 4.7G, 700M)");
+                        maxSize = sizes.Parse(value) ?? throw new FormatException("--max-size needs a size (examples: 4000000000, 4G, 700M)");
                     }
                     catch (FormatException exception)
                     {

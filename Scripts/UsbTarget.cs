@@ -40,13 +40,13 @@ switch (command)
             mount -t overlay overlay -o lowerdir="$base/mnt/c:$base/mnt/b:$base/mnt/a" "$base/mnt/merged"
             cp -a "$base/mnt/merged/." "$target/"
             umount "$base/mnt/merged"
-            mkdir -p "$target/cdrom"
-            mount --bind "$drive" "$target/cdrom"
+            mkdir -p "$target/usbdrive"
+            mount --bind "$drive" "$target/usbdrive"
             mount -t proc proc "$target/proc"; mount -t sysfs sysfs "$target/sys"; mount --bind /dev "$target/dev"; mount -t tmpfs tmpfs "$target/run"
-            trap 'umount "$target/cdrom" "$target/run" "$target/dev" "$target/sys" "$target/proc" 2>/dev/null || true; umount "$base/mnt/c" "$base/mnt/b" "$base/mnt/a" 2>/dev/null || true' EXIT
+            trap 'umount "$target/usbdrive" "$target/run" "$target/dev" "$target/sys" "$target/proc" 2>/dev/null || true; umount "$base/mnt/c" "$base/mnt/b" "$base/mnt/a" 2>/dev/null || true' EXIT
             printf '#!/bin/sh\nexit 101\n' > "$target/usr/sbin/policy-rc.d"; chmod +x "$target/usr/sbin/policy-rc.d"
             mkdir -p "$target/etc/apt/off"; mv "$target"/etc/apt/sources.list.d/* "$target/etc/apt/off/" 2>/dev/null || true; mv "$target/etc/apt/sources.list" "$target/etc/apt/off/" 2>/dev/null || true
-            echo "deb [trusted=yes] file:///cdrom noble main restricted" > "$target/etc/apt/sources.list"
+            echo "deb [trusted=yes] file:///usbdrive noble main restricted" > "$target/etc/apt/sources.list"
             chroot "$target" apt-get -q -o Acquire::Languages=none update
             chroot "$target" env DEBIAN_FRONTEND=noninteractive apt-get -q -y -o Dpkg::Options::=--force-confold install linux-generic-hwe-24.04
             chroot "$target" env DEBIAN_FRONTEND=noninteractive dpkg --configure -a

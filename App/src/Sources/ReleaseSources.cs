@@ -54,17 +54,6 @@ internal interface IReleaseSources
     Task<BlenderRelease> LatestBlender(CancellationToken cancellation = default);
 
     /// <summary>
-    /// Finds a release of a GitHub repository by its tag, for a component that is pinned to one version on purpose.
-    /// </summary>
-    /// <param name="repository">The repository, <c>owner/name</c>.</param>
-    /// <param name="tag">The release tag.</param>
-    /// <param name="patterns">One regular expression per wanted asset; the first asset whose name matches is taken.</param>
-    /// <param name="cancellation">Stops the lookup when cancelled.</param>
-    /// <returns>The release.</returns>
-    /// <exception cref="InvalidOperationException">The release is a draft or an asset is missing.</exception>
-    Task<GitHubRelease> GitHubTag(string repository, string tag, IReadOnlyList<string> patterns, CancellationToken cancellation = default);
-
-    /// <summary>
     /// Finds the highest stable version of a NuGet package.
     /// </summary>
     /// <param name="packageId">The package id.</param>
@@ -143,18 +132,6 @@ internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IR
         if (release["prerelease"]?.GetValue<bool>() == true || release["draft"]?.GetValue<bool>() == true)
         {
             throw new InvalidOperationException($"{repository}: the latest release is not a stable release");
-        }
-
-        return new() { Tag = tag, Assets = Assets(release, repository, tag, patterns) };
-    }
-
-    /// <inheritdoc />
-    public async Task<GitHubRelease> GitHubTag(string repository, string tag, IReadOnlyList<string> patterns, CancellationToken cancellation = default)
-    {
-        JsonNode release = await http.GetJson($"https://api.github.com/repos/{repository}/releases/tags/{tag}", null, cancellation);
-        if (release["draft"]?.GetValue<bool>() == true)
-        {
-            throw new InvalidOperationException($"{repository} {tag}: the release is a draft");
         }
 
         return new() { Tag = tag, Assets = Assets(release, repository, tag, patterns) };

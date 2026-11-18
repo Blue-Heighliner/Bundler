@@ -6,7 +6,7 @@ namespace BlueHeighliner.Bundler;
 internal interface IByteSizes
 {
     /// <summary>
-    /// Reads a size such as <c>4700000000</c>, <c>4.7G</c>, <c>700M</c>, <c>4GB</c> or <c>4GiB</c>. A plain number is bytes, K, M and G
+    /// Reads a size such as <c>4000000000</c>, <c>4G</c>, <c>700M</c>, <c>4GB</c> or <c>4GiB</c>. A plain number is bytes, K, M and G
     /// (with or without a B) are powers of 1000, and KiB, MiB and GiB are powers of 1024.
     /// </summary>
     /// <param name="text">The text; empty or white space means no size.</param>
@@ -54,7 +54,7 @@ internal sealed partial class ByteSizes : IByteSizes
         Match match = SizePattern().Match(text.Trim());
         if (!match.Success || !units.TryGetValue(match.Groups["unit"].Value, out long unit) || !decimal.TryParse(match.Groups["number"].Value, System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture, out decimal number))
         {
-            throw new FormatException($"'{text}' is not a size (examples: 4700000000, 4.7G, 700M, 4GiB)");
+            throw new FormatException($"'{text}' is not a size (examples: 4000000000, 4G, 700M, 4GiB)");
         }
 
         return (long)(number * unit);
