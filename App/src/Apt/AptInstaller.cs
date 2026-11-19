@@ -136,6 +136,11 @@ internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex inde
                 .Distinct().Order(StringComparer.Ordinal).ToList();
             if (remove.Count == 0)
             {
+                remove = await RemovableAlone(present, running, cancellation);
+            }
+
+            if (remove.Count == 0)
+            {
                 break;
             }
 
@@ -158,6 +163,25 @@ internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex inde
 
     [GeneratedRegex(@"^linux-.*-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-[a-z0-9]+$")]
     private static partial Regex KernelPattern();
+
+    private async Task<List<string>> RemovableAlone(List<string> present, string running, CancellationToken cancellation)
+    {
+        HashSet<string> own = [.. present.Select(Plain)];
+        List<string> alone = [];
+        foreach (string package in present.Where(package => !package.Contains(running, StringComparison.Ordinal)))
+        {
+            ProcessResult simulation = await runner.Run(new() { FileName = "apt-get", Arguments = ["-s", "remove", package], Check = false }, cancellation);
+            if (simulation.Success && RemovePattern().Matches(simulation.Output).Select(match => Plain(match.Groups["name"].Value)).All(own.Contains))
+            {
+                alone.Add(package);
+            }
+        }
+
+        return [.. alone.Order(StringComparer.Ordinal)];
+    }
+
+    private string Plain(string name)
+        => name.Split(':')[0];
 
     private async Task<List<string>> Installed(IEnumerable<string> packages, CancellationToken cancellation)
     {

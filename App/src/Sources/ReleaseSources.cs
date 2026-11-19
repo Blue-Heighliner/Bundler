@@ -63,6 +63,23 @@ internal interface IReleaseSources
     Task<string?> LatestNuGet(string packageId, string? range = null, CancellationToken cancellation = default);
 
     /// <summary>
+    /// Finds the newest stable CPython in the latest release of python-build-standalone, as the archive that holds just the Python
+    /// installation (with pip). Alphas, betas, release candidates and the free-threaded builds are not taken.
+    /// </summary>
+    /// <param name="cancellation">Stops the lookup when cancelled.</param>
+    /// <returns>The release, whose checksum is the digest GitHub states for the archive.</returns>
+    /// <exception cref="InvalidOperationException">The release has no such archive.</exception>
+    Task<ArchiveRelease> LatestPython(CancellationToken cancellation = default);
+
+    /// <summary>
+    /// Finds the newest stable Node.js on nodejs.org (no alphas or release candidates) as its Linux x64 archive.
+    /// </summary>
+    /// <param name="cancellation">Stops the lookup when cancelled.</param>
+    /// <returns>The release, whose checksum comes from the <c>SHASUMS256.txt</c> of that version.</returns>
+    /// <exception cref="InvalidOperationException">No stable release with a Linux x64 archive and a checksum is found.</exception>
+    Task<ArchiveRelease> LatestNode(CancellationToken cancellation = default);
+
+    /// <summary>
     /// Reads the driver version NVIDIA lists as its latest stable release.
     /// </summary>
     /// <param name="cancellation">Stops the lookup when cancelled.</param>
@@ -71,7 +88,7 @@ internal interface IReleaseSources
 }
 
 /// <inheritdoc />
-internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IReleaseSources
+internal sealed partial class ReleaseSources(IHttpFetcher http, IVersions versions) : IReleaseSources
 {
     /// <inheritdoc />
     public async Task<DotNetRelease> LatestDotNet(string? channel = null, CancellationToken cancellation = default)
@@ -208,6 +225,38 @@ internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IR
     }
 
     /// <inheritdoc />
+    public async Task<ArchiveRelease> LatestPython(CancellationToken cancellation = default)
+    {
+        JsonNode release = await http.GetJson("https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest", null, cancellation);
+        Regex pattern = PythonArchive();
+        JsonNode newest = release["assets"]!.AsArray().Where(node => pattern.IsMatch(node!["name"]!.GetValue<string>()))
+            .OrderBy(node => pattern.Match(node!["name"]!.GetValue<string>()).Groups["version"].Value, Comparer<string>.Create(versions.Compare)).LastOrDefault()
+            ?? throw new InvalidOperationException("python-build-standalone: the latest release has no stable CPython archive for Linux x64");
+        string name = newest["name"]!.GetValue<string>();
+        return new()
+        {
+            Version = pattern.Match(name).Groups["version"].Value,
+            Url = newest["browser_download_url"]!.GetValue<string>(),
+            FileName = name,
+            Hash = HashSpec.Parse(newest["digest"]?.GetValue<string>()) ?? throw new InvalidOperationException($"python-build-standalone: GitHub states no checksum for {name}"),
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<ArchiveRelease> LatestNode(CancellationToken cancellation = default)
+    {
+        JsonNode index = await http.GetJson("https://nodejs.org/dist/index.json", cancellation: cancellation);
+        string version = index.AsArray().Where(node => !node!["version"]!.GetValue<string>().Contains('-') && node["files"]!.AsArray().Any(file => file!.GetValue<string>() == "linux-x64"))
+            .Select(node => node!["version"]!.GetValue<string>().TrimStart('v')).OrderBy(found => found, Comparer<string>.Create(versions.Compare)).LastOrDefault()
+            ?? throw new InvalidOperationException("nodejs.org lists no stable Node.js release with a Linux x64 archive");
+        string fileName = $"node-v{version}-linux-x64.tar.xz";
+        string sums = await http.GetString($"https://nodejs.org/dist/v{version}/SHASUMS256.txt", cancellation: cancellation);
+        string hash = sums.Split('\n').Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)).Where(fields => fields.Length == 2 && fields[1].Trim() == fileName).Select(fields => fields[0]).FirstOrDefault()
+            ?? throw new InvalidOperationException($"Node.js {version}: no checksum for {fileName}");
+        return new() { Version = version, Url = $"https://nodejs.org/dist/v{version}/{fileName}", FileName = fileName, Hash = new("sha256", hash.ToLowerInvariant()) };
+    }
+
+    /// <inheritdoc />
     public async Task<string> LatestNvidiaDriver(CancellationToken cancellation = default)
     {
         string text = (await http.GetString("https://download.nvidia.com/XFree86/Linux-x86_64/latest.txt", cancellation: cancellation)).Split(' ', '\n')[0].Trim();
@@ -236,4 +285,7 @@ internal sealed class ReleaseSources(IHttpFetcher http, IVersions versions) : IR
 
         return assets;
     }
+
+    [GeneratedRegex(@"^cpython-(?<version>[0-9]+\.[0-9]+\.[0-9]+)\+[0-9]+-x86_64-unknown-linux-gnu-install_only\.tar\.gz$")]
+    private static partial Regex PythonArchive();
 }

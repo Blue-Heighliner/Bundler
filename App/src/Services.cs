@@ -39,6 +39,9 @@ internal static class ServiceCollectionExtensions
             services.AddSingleton<IReleaseSources, ReleaseSources>();
             services.AddSingleton<IMarketplace, Marketplace>();
             services.AddSingleton<IOllamaRegistry, OllamaRegistry>();
+            services.AddSingleton<IOllamaModelFiles, OllamaModelFiles>();
+            services.AddSingleton<IPythonWheels, PythonWheels>();
+            services.AddSingleton<IToolInstaller, ToolInstaller>();
             services.AddSingleton<IDebIndex, DebIndex>();
             services.AddSingleton<IAptBuilder, AptBuilder>();
             services.AddSingleton<IAptInstaller, AptInstaller>();
@@ -57,6 +60,9 @@ internal static class ServiceCollectionExtensions
             services.AddSingleton<IBundle, OllamaBundle>();
             services.AddSingleton<IBundle, VsCodeBundle>();
             services.AddSingleton<IBundle, GemmaBundle>();
+            services.AddSingleton<IBundle, PythonBundle>();
+            services.AddSingleton<IBundle, NodeBundle>();
+            services.AddSingleton<IBundle, ChromaDbBundle>();
             services.AddSingleton<IBundle, OpenCodeBundle>();
             services.AddSingleton<IOpenCodeFiles, OpenCodeFiles>();
             services.AddSingleton<IDotNetFiles, DotNetFiles>();
@@ -69,6 +75,9 @@ internal static class ServiceCollectionExtensions
             services.AddSingleton<IBundle, GimpBundle>();
             services.AddSingleton<IBundle, KritaBundle>();
             services.AddSingleton<IBundle, BlenderBundle>();
+            services.AddSingleton<IBundle, XWaylandBundle>();
+            services.AddSingleton<IBundle, VirtualTestingBundle>();
+            services.AddSingleton<IBundle, LibreOfficeBundle>();
             services.AddSingleton<IBundle, AutoRemoteBundle>();
             services.AddSingleton<IAutoRemoteFiles, AutoRemoteFiles>();
             services.AddSingleton<IBundleCatalog, BundleCatalog>();

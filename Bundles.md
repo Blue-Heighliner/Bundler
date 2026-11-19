@@ -13,7 +13,10 @@ How installs treat what is already on the computer: a missing component is insta
 | [`dotnet`](#dotnet) | none | .NET 10 and 11 SDKs, offline NuGet feed |
 | [`ollama`](#ollama) | none | Ollama local model server as a systemd service |
 | [`vs-code`](#vs-code) | `git`, `dotnet`, `ollama` | VS Code with C#, Git Graph, .NET Install Tool and Cline |
+| [`python`](#python) | none | Python 3.15 with pip, venv and the headers |
+| [`node`](#node) | none | Node.js with npm and npx |
 | [`gemma`](#gemma) | `ollama` | Gemma 4 26B-A4B model for Ollama and Cline |
+| [`chroma-db`](#chroma-db) | `ollama` | ChromaDB vector database as a systemd service, Nomic embedding model for Ollama |
 | [`open-code`](#open-code) | `git` | OpenCode AI coding agent |
 | [`xunit`](#xunit) | `dotnet` | xunit v3, Moq, coverlet.collector NuGet packages |
 | [`avalonia`](#avalonia) | `dotnet` | Avalonia, CommunityToolkit.Mvvm, Tmds.DBus.Protocol and more NuGet packages, `dotnet new` templates |
@@ -23,10 +26,13 @@ How installs treat what is already on the computer: a missing component is insta
 | [`podman`](#podman) | none | Podman container engine |
 | [`gimp`](#gimp) | none | GIMP photo editor |
 | [`krita`](#krita) | none | Krita painting program |
+| [`libre-office`](#libre-office) | none | LibreOffice Writer, Calc, Impress, Draw, Math and Base |
 | [`blender`](#blender) | none | Blender 3D modeling, animation and rendering |
+| [`xwayland`](#xwayland) | none | Xwayland, the X server for Wayland desktops |
+| [`virtual-testing`](#virtual-testing) | none | Xvfb, xauth, Openbox, Cage, xdotool, wtype, wlrctl, scrot, grim and ImageMagick for testing on virtual screens |
 | [`auto-remote`](#auto-remote) | `git`, `dotnet`, `ollama`, `gemma`, `open-code` | Auto Remote server as a systemd user service and its Linux desktop client with an app finder entry |
 
-A bundle needs another only when its content or its setup uses it: the NuGet bundles and `godot` add to the feed of `dotnet`; `vs-code` configures the .NET SDK, git and Ollama; `gemma` is a model for `ollama`; `open-code` runs git; `auto-remote` runs git, scripts with `dotnet` and workspaces on the local model through `open-code` and `ollama`. `gemma` does not need `vs-code` (its Cline settings are only files), and nothing needs `a2000` (Ollama uses a GPU driver when there is one and runs on the CPU without).
+A bundle needs another only when its content or its setup uses it: the NuGet bundles and `godot` add to the feed of `dotnet`; `vs-code` configures the .NET SDK, git and Ollama; `gemma` and `chroma-db` bring models for `ollama`; `open-code` runs git; `auto-remote` runs git, scripts with `dotnet` and workspaces on the local model through `open-code` and `ollama`. `gemma` does not need `vs-code` (its Cline settings are only files), and nothing needs `a2000` (Ollama uses a GPU driver when there is one and runs on the CPU without).
 
 `install <bundle>` installs the bundles it needs first if they are not installed yet (their files must be in the Bundles folder), and a bundle cannot be uninstalled while another installed bundle needs it.
 
@@ -83,6 +89,25 @@ VS Code for every user, set up to work offline: it finds the .NET SDK and git, t
 | Cline | 4.1.26 | Coding agent for VS Code that works through the local Ollama (`saoudrizwan.claude-dev`). Its cloud sign-in and hosted models are not used. | Apache-2.0 | Free use. |
 | Support libraries | - | xdg-utils and ca-certificates for VS Code; installed only when missing. | GPL-2.0, LGPL-2.1, MIT, BSD-3-Clause | Free use. |
 
+## python
+
+The newest stable CPython (3.15) from python-build-standalone, an Astral project that builds Python so that it needs nothing from the computer but the C library, with pip, venv, the headers and Tcl/Tk. It is installed in `/opt/python/<version>` with the commands `python`, `python3.15`, `pip` and `pip3.15` in `/usr/local/bin`. The command `python3` stays the system's Python 3.12, which the operating system itself uses. A Python of the same or a newer version that is already there is kept. Without a network, `pip` installs from wheels that were brought along (`pip install --no-index --find-links FOLDER NAME`); the wheels of the `chroma-db` bundle are an example.
+
+| Service | Version | Description | License | Usage |
+|---|---|---|---|---|
+| CPython | 3.15.2 | The Python interpreter and its standard library, with the development headers. | Python-2.0 | Free use. |
+| pip | 26.3 | The package installer, with the libraries it carries (CacheControl, certifi, distlib, idna, packaging, platformdirs, Pygments, requests, resolvelib, rich, tomli, truststore, urllib3 and others). | MIT, Apache-2.0, BSD-3-Clause, BSD-2-Clause, ISC, MPL-2.0, PSF-2.0 | Free use. |
+| Libraries built in | - | OpenSSL 3, SQLite, zlib, bzip2, xz, zstd, libffi, expat, libedit, ncurses, mpdecimal, libuuid, Berkeley DB (for the `dbm` module), Tcl/Tk and the X11 client libraries. | Apache-2.0, 0BSD, BSD-2-Clause, BSD-3-Clause, MIT, Sleepycat, TCL, X11, Zlib, bzip2-1.0.6 | Free use. The Berkeley DB license (Sleepycat) asks for the source of a program that contains it when that program is passed on; nothing is passed on. |
+
+## node
+
+The newest stable Node.js (26.13.1, which is also the Lithium long-term-support line) from nodejs.org, with npm and npx (the Node.js 26 archive no longer includes corepack). It is installed in `/opt/node/<version>` with the commands `node`, `npm` and `npx` in `/usr/local/bin`. A Node.js of the same or a newer version that is already there is kept. npm installs from a registry, so without a network packages have to be brought along (`npm install ./package.tgz`).
+
+| Service | Version | Description | License | Usage |
+|---|---|---|---|---|
+| Node.js | 26.13.1 | The JavaScript runtime with V8 and the libraries built into it (ICU, OpenSSL, libuv, undici, nghttp2, zlib, brotli, zstd, simdjson and others). | MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Zlib, CC0-1.0, Unicode-3.0, BlueOak-1.0.0 | Free use. |
+| npm | 11.20.0 | The package manager and its `npx` command. | Artistic-2.0, MIT, ISC | Free use. |
+
 ## gemma
 
 Gemma 4 26B-A4B for Ollama, set as the model of Cline (32K context; the Cline settings are written whether or not VS Code is installed). Needs roughly 24 GB of RAM or more. An identical model that is already installed is skipped; a changed model of the same name replaces the old one.
@@ -90,6 +115,17 @@ Gemma 4 26B-A4B for Ollama, set as the model of Cline (32K context; the Cline se
 | Service | Version | Description | License | Usage |
 |---|---|---|---|---|
 | Gemma 4 26B-A4B | gemma4:26b | Large language model (25.2B parameters, Q4_K_M, 18.7 GB, needs Ollama 0.30.9 or newer). | Apache-2.0 | Free use. |
+
+## chroma-db
+
+The ChromaDB vector database and the Nomic embedding model (`nomic-embed-text`) that turns text into the vectors it stores. ChromaDB comes as Python wheels that install, with no network, into a virtual environment of its own in `/opt/chroma-db/venv`, with the `chroma` command in `/usr/local/bin`. It runs as the systemd service `chroma-db`, enabled at boot, as the `chroma` user on `127.0.0.1:8000` (nothing else on the network can reach it), with its data in `/var/lib/chroma-db` and no telemetry. The model goes into Ollama (needs the `ollama` bundle), which serves the embeddings at `http://localhost:11434`; ChromaDB's own default embedding model is downloaded from the internet, so collections are made with the Ollama embedding function and `nomic-embed-text:latest` (`chromadb.utils.embedding_functions.OllamaEmbeddingFunction`, which needs the `ollama` Python client that is installed with ChromaDB). An uninstall removes the service, the environment and the model and keeps the data folder and the `chroma` user while there is data in it.
+
+| Service | Version | Description | License | Usage |
+|---|---|---|---|---|
+| ChromaDB | 1.5.9 | The vector database (a Rust server with a Python client), as wheels for Python 3.12. | Apache-2.0 | Free use. |
+| Python packages | - | The packages ChromaDB needs and the `ollama` Python client, as wheels (numpy, onnxruntime, pydantic, grpcio, tokenizers, uvicorn, opentelemetry, kubernetes, aiohttp and others); the license of each is in `python-licenses.tsv` inside the bundle. | Apache-2.0, MIT, BSD-3-Clause, BSD-2-Clause, ISC, PSF-2.0, MPL-2.0, 0BSD, Zlib, CC0-1.0 | Free use. |
+| Nomic embed text | nomic-embed-text:latest | Text embedding model (v1.5, 137M parameters, F16, 274 MB) for Ollama, from Nomic AI. | Apache-2.0 | Free use. |
+| Python virtual environments | 3.12.3 | `python3.12-venv` with the pip and setuptools wheels it needs (Ubuntu 24.04 packages); installed only when missing. | Python-2.0, MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, ISC, LGPL-2.1 | Free use. The license differs per package. |
 
 ## open-code
 
@@ -189,6 +225,16 @@ Krita (5.2) from the Ubuntu 24.04 archive, with the libraries it needs (Qt 5, KD
 | Krita brushes and bundled code | 5.2.2 | Brushes, presets, patterns and small third-party libraries shipped with Krita (`krita-data`). | CC-BY-SA-3.0, CC0-1.0, BSL-1.0, NCSA, Unlicense | Free use. |
 | Libraries | - | Qt 5 and the other libraries Krita needs; installed only when missing. | GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, MIT, BSD-3-Clause | Free use. The license differs per package. |
 
+## libre-office
+
+LibreOffice (24.2) from the Ubuntu 24.04 archive: Writer (documents), Calc (spreadsheets), Impress (presentations), Draw (drawings), Math (formulas) and Base (databases), with Base's embedded Firebird database engine, Python macros and the English grammar checker. The installer USB drive already has every tool but Base, so the bundle adds Base and brings the others to the archive's newest version. Java is not included (the HSQLDB engine and the few functions that need a Java runtime do not work); the embedded Firebird engine is what Base uses without it.
+
+| Service | Version | Description | License | Usage |
+|---|---|---|---|---|
+| LibreOffice | 24.2.7 | Writer, Calc, Impress, Draw, Math and Base (`libreoffice-writer`, `-calc`, `-impress`, `-draw`, `-math`, `-base`) and the parts they share. | MPL-2.0, LGPL-3.0, GPL-3.0, GPL-2.0, MIT, Apache-2.0, BSD-3-Clause, BSD-2-Clause, CC0-1.0, CC-BY-SA-3.0 | Free use. The license differs per file; the main license is MPL-2.0. |
+| Firebird embedded | 3.0.11 | Base's database engine (`libreoffice-sdbc-firebird`, `firebird3.0-server-core`, `libfbclient2`, `libtommath1`). | IDPL-1.0, IPL-1.0, Unlicense | Free use. |
+| Python macros and grammar checker | 24.2.7 | `libreoffice-script-provider-python` and `libreoffice-lightproof-en`. | MPL-2.0, LGPL-3.0, GPL-3.0 | Free use. |
+
 ## blender
 
 Blender, the 3D modeling, sculpting, animation and rendering program, which exports glTF, FBX, OBJ and STL for games and apps (such as Godot). It comes from Blender's own Linux release archive, because the Ubuntu 24.04 archive is far behind (4.0.2 against 5.3.0 at the last build); the archive is checked against the SHA-256 checksum Blender publishes. It is installed in `/opt/blender` with a `blender` command and a menu entry, and an install of a newer Blender replaces the older one. The archive carries its own license folder, which lists every library built into Blender; it was searched for non-commercial, research-only or similar terms and has none.
@@ -200,6 +246,32 @@ Blender, the 3D modeling, sculpting, animation and rendering program, which expo
 | Smaller library licenses | 5.3.0 | Licenses of smaller libraries and code in Blender (compression, PNG and TIFF, FreeType, OpenGL headers and others). | 0BSD, bzip2-1.0.6, FTL, libpng-2.0, libtiff, MIT-Khronos-old, SGI-B-2.0, TOST-1.0 | Free use. |
 | Fonts | 5.3.0 | The fonts of Blender's interface and text objects. | OFL-1.1, Bitstream-Vera, Arev-Fonts | Free use. |
 | Support libraries | - | X11, OpenGL, Wayland and other system libraries the program needs, and xz to unpack it; installed only when missing. | GPL-2.0, LGPL-2.1, MIT, BSD-3-Clause | Free use. The license differs per package. |
+
+## xwayland
+
+Xwayland (23.2.6), the X server that lets X11 programs run on a Wayland desktop, from the Ubuntu 24.04 archive. The installer USB drive has it already; the bundle brings the archive's newest version and anything that version needs.
+
+| Service | Version | Description | License | Usage |
+|---|---|---|---|---|
+| Xwayland | 23.2.6 | The X server for Wayland desktops (`xwayland`). | MIT | Free use. |
+
+## virtual-testing
+
+The packages for testing programs automatically on virtual screens, from the Ubuntu 24.04 archive: Xvfb with xauth and the Openbox window manager (a virtual X11 screen), Cage (a virtual Wayland screen), the tools that type, click and move windows (xdotool for X11, wtype and wlrctl for Wayland) and the tools that take and compare pictures of the screen (scrot for X11, grim for Wayland, ImageMagick). Nothing starts by itself: a test starts what it needs, for example `Xvfb :99 &` and `DISPLAY=:99 openbox &`, or `WLR_BACKENDS=headless cage -- PROGRAM`.
+
+| Service | Version | Description | License | Usage |
+|---|---|---|---|---|
+| Xvfb | 21.1.12 | Virtual X11 screen (`xvfb`, from the X.Org server). | MIT | Free use. |
+| xauth | 1.1.2 | Keeps the X11 access keys that Xvfb needs. | MIT | Free use. |
+| xdotool | 3.20160805.1 | Types, clicks and moves windows on an X11 screen. | BSD-3-Clause | Free use. |
+| scrot | 1.10 | Screenshots of an X11 screen. | MIT, BSD-3-Clause | Free use. |
+| Openbox | 3.6.1 | A small window manager for the virtual X11 screen. | GPL-2.0, GPL-3.0, BSD-3-Clause | Free use. |
+| Cage | 0.1.5 | A kiosk Wayland compositor that runs one program, also on a virtual (headless) screen. | MIT | Free use. |
+| wtype | 0.4 | Types on a Wayland screen. | MIT | Free use. |
+| wlrctl | 0.2.2 | Controls windows on a Wayland screen. | MIT | Free use. |
+| grim | 1.4.0 | Screenshots of a Wayland screen. | MIT | Free use. |
+| ImageMagick | 6.9.12 | Converts and compares pictures (`convert`, `compare`, `identify`). | Apache-2.0, GPL-2.0, LGPL-3.0 | Free use. The ImageMagick license is the Apache license with a preamble. |
+| Libraries | - | wlroots, libseat, Imlib2, libxcb parts and the other libraries these need; installed only when missing. | MIT, LGPL-2.1, GPL-2.0, CC0-1.0, BSD-3-Clause | Free use. The license differs per package. |
 
 ## auto-remote
 
@@ -246,6 +318,16 @@ Where a license text or a metadata field was read for a service, and where it wa
 | blender | Blender | the `license` folder inside the official release archive (`license.md`, `licenses.json`): Blender is GPL-3.0-or-later and the libraries inside it with their licenses are listed there; searched for non-commercial or similar terms, none found |
 | open-code | OpenCode | the repository `LICENSE` at the release tag (MIT) and the npm package metadata (MIT); not read: the licenses of the JavaScript dependencies compiled into the program, since the release carries no third-party notices file |
 | auto-remote | Auto Remote server and desktop client | the repository `LICENSE` (MIT) and the release's `THIRD-PARTY-NOTICES.txt` (both read again for 1.3.10; the notices list the .NET runtime, Live AI, Whisper.net, whisper.cpp, ggml and Microsoft.Extensions.AI.Abstractions, all MIT); the Whisper.net package's `LICENSE` read (MIT); the client's Avalonia (MIT), SkiaSharp and Skia (MIT, BSD-3-Clause) and Markdig (BSD-2-Clause) from their package metadata, not read in full, and the release's notices file does not cover the client; the voice model the server downloads at run time is not part of the bundle and was not reviewed |
+| python | CPython and the libraries built in | `licenses/LICENSE.cpython.txt` and the other texts in the `licenses` folder of the full build of the same python-build-standalone release (20261110): Python-2.0 and CNRI-Python for the interpreter; OpenSSL 3 (Apache-2.0), SQLite (public domain), zlib, zlib-ng, bzip2, xz (0BSD), zstd, libffi, expat, libedit, ncurses (X11), mpdecimal, libuuid, libX11, libXau, libxcb, Berkeley DB (Sleepycat), Tcl/Tk and Tix (TCL) read; pip's own `licenses` folder inside the archive read for the packages it carries |
+| node | Node.js and npm | the `LICENSE` file of the tarball, which lists the license of every bundled library (read for the components named in the table; npm is under the Artistic License 2.0, ICU under the Unicode license, minimatch under the Blue Oak Model License); none restricts commercial or government use |
+| chroma-db | ChromaDB and its Python packages | the wheel metadata of all 84 wheels (SPDX expression, license field or classifiers, written into `python-licenses.tsv`; all permissive or MPL-2.0 at file level); `LICENSE` of the chromadb wheel not read in full |
+| chroma-db | Nomic embed text | `LICENSE.txt` of the model in the Ollama registry (Apache-2.0, read) |
+| chroma-db | Python virtual environments | Debian copyright files of `python3.12`, `python3-pip-whl`, `python3-setuptools-whl` and `python3-pkg-resources`, searched for non-commercial, research-only or similar terms and have none |
+| libre-office | LibreOffice | Debian copyright file of `libreoffice-core`, shared by the other packages (MPL-2.0 with Apache-2.0, MIT, LGPL, GPL, CC0, CC-BY-SA-3.0 and BSD parts), searched for non-commercial, research-only or similar terms and has none |
+| libre-office | Firebird embedded | Debian copyright file of `firebird3.0-common-doc` (IDPL-1.0 and IPL-1.0, whose texts are in it and in `licenses/texts/`; MPL-1.1, LGPL and public domain parts) and of `libtommath1` (public domain) |
+| libre-office | Python macros and grammar checker | Debian copyright files (MPL 1.1, GPL-3+ and LGPL-3+ for Lightproof) |
+| xwayland | Xwayland | Debian copyright file of `xwayland` (the X.Org Foundation's MIT license), searched for non-commercial terms and has none |
+| virtual-testing | all packages | Debian copyright files of every package and of the ImageMagick, wlroots and X.Org libraries that come with them (Expat/MIT, BSD-3-Clause, GPL-2+, GPL-3+, LGPL-2.1+, LGPL-3+, CC0-1.0; ImageMagick is "Apache-2.0 with an additional preamble"; scrot's `MIT-feh` is an MIT variant), searched for non-commercial, research-only or similar terms and have none |
 
 ## Left out on purpose
 

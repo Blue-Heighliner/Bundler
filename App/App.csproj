@@ -29,6 +29,7 @@
     <AvaloniaResource Include="src\Assets\**" />
     <EmbeddedResource Include="src\Resources\**" LogicalName="Resources/%(RecursiveDir)%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\licenses\reviewed-nuget.tsv" LogicalName="Resources/reviewed-nuget.tsv" />
+    <EmbeddedResource Include="..\licenses\reviewed-python.tsv" LogicalName="Resources/reviewed-python.tsv" />
     <EmbeddedResource Include="..\Bundles.md" LogicalName="Resources/Bundles.md" />
     <EmbeddedResource Include="..\licenses\texts\*.txt" LogicalName="Resources/licenses/%(Filename)%(Extension)" />
   </ItemGroup>

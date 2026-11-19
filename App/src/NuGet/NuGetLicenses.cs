@@ -36,7 +36,7 @@ internal sealed partial class NuGetLicenses(IResources resources) : INuGetLicens
     private static readonly HashSet<string> permissive = new(StringComparer.Ordinal)
     {
         "MIT", "MIT-0", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "0BSD", "ISC", "MS-PL", "Zlib", "Unlicense", "CC0-1.0",
-        "BSL-1.0", "MPL-2.0", "Python-2.0", "PostgreSQL", "X11", "WTFPL", "BlueOak-1.0.0",
+        "BSL-1.0", "MPL-2.0", "Python-2.0", "PSF-2.0", "PostgreSQL", "X11", "WTFPL", "BlueOak-1.0.0",
     };
 
     /// <inheritdoc />

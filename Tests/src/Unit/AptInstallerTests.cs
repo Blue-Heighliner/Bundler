@@ -6,6 +6,7 @@ public sealed class AptInstallerTests : IDisposable
     private readonly Mock<IProcessRunner> runner = new();
     private readonly HashSet<string> installed = [];
     private readonly HashSet<string> removable = [];
+    private readonly Dictionary<string, string[]> neededBy = [];
     private readonly List<string[]> removed = [];
     private readonly AptInstaller installer;
 
@@ -17,6 +18,9 @@ public sealed class AptInstallerTests : IDisposable
             {
                 case "dpkg-query":
                     return new ProcessResult(0, installed.Contains(command.Arguments[^1]) ? "installed 1.0\n" : "not-installed \n", string.Empty);
+                case "apt-get" when command.Arguments[0] == "-s" && command.Arguments.Contains("remove"):
+                    string alone = command.Arguments[^1];
+                    return new ProcessResult(0, string.Concat(new[] { alone }.Concat(neededBy.GetValueOrDefault(alone, [])).Select(name => $"Remv {name} [1.0]\n")), string.Empty);
                 case "apt-get" when command.Arguments[0] == "-s":
                     return new ProcessResult(0, string.Concat(removable.Where(installed.Contains).Select(name => $"Remv {name} [1.0]\n")), string.Empty);
                 case "apt-get" when command.Arguments[0] == "remove":
@@ -58,8 +62,9 @@ public sealed class AptInstallerTests : IDisposable
     [Fact]
     public async Task RemoveAdded_KeepsWhatAnotherBundleStillNeedsAndRemembersIt()
     {
-        installed.UnionWith(["liba", "libb"]);
+        installed.UnionWith(["liba", "libb", "another-bundles-package"]);
         removable.Add("liba");
+        neededBy["libb"] = ["another-bundles-package"];
         BundleState state = State("blender");
         state.Add("apt-new", "liba");
         state.Add("apt-new", "libb");
@@ -71,6 +76,36 @@ public sealed class AptInstallerTests : IDisposable
     }
 
     [Fact]
+    public async Task RemoveAdded_APackageAptKeepsAsOneAlternativeOfADependencyButNothingNeeds_IsRemoved()
+    {
+        installed.UnionWith(["openbox", "libobt2v5:amd64"]);
+        BundleState state = State("virtual-testing");
+        state.Add("apt-new", "openbox");
+        state.Add("apt-new", "libobt2v5:amd64");
+
+        await installer.RemoveAdded(state);
+
+        Assert.Equal(["libobt2v5:amd64", "openbox"], Assert.Single(removed));
+        Assert.Empty(installed);
+        Assert.False(File.Exists(Leftover));
+    }
+
+    [Fact]
+    public async Task RemoveAdded_APackageWhoseRemovalWouldTakeOtherSoftwareWithIt_IsKept()
+    {
+        installed.UnionWith(["libneeded", "some-other-program"]);
+        neededBy["libneeded"] = ["some-other-program"];
+        BundleState state = State("bundle");
+        state.Add("apt-new", "libneeded");
+
+        await installer.RemoveAdded(state);
+
+        Assert.Empty(removed);
+        Assert.Contains("libneeded", installed);
+        Assert.Equal(["libneeded"], File.ReadAllLines(Leftover));
+    }
+
+    [Fact]
     public async Task RemoveAdded_LaterUninstall_RemovesTheLeftoversOfAnEarlierOne()
     {
         installed.UnionWith(["libb", "gimp"]);
@@ -78,11 +113,13 @@ public sealed class AptInstallerTests : IDisposable
         first.Add("apt-new", "libb");
         BundleState second = State("gimp");
         second.Add("apt-new", "gimp");
+        neededBy["libb"] = ["gimp"];
 
         await installer.RemoveAdded(first);
         Assert.Equal(["libb"], File.ReadAllLines(Leftover));
 
         removable.UnionWith(["libb", "gimp"]);
+        neededBy.Clear();
         await installer.RemoveAdded(second);
 
         Assert.Empty(installed);

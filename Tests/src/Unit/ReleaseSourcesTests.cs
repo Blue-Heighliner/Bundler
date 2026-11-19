@@ -230,4 +230,86 @@ public sealed class ReleaseSourcesTests
 
         Assert.Equal("1.2.0", await sources.LatestNuGet("Some.Package", "1.*"));
     }
+
+    private static JsonNode PythonRelease(params string[] names)
+        => new JsonObject { ["assets"] = new JsonArray([.. names.Select(name => (JsonNode)new JsonObject { ["name"] = name, ["browser_download_url"] = "https://example.test/" + name, ["digest"] = name.Contains("3.15", StringComparison.Ordinal) ? "sha256:abcd" : "sha256:ffff" })]) };
+
+    [Fact]
+    public async Task LatestPython_TakesTheNewestStableInstallOnlyArchive()
+    {
+        http.Setup(h => h.GetJson("https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest", null, It.IsAny<CancellationToken>())).ReturnsAsync(PythonRelease(
+            "cpython-3.14.10+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.15.2+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.15.2+20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "cpython-3.15.2+20261110-x86_64-unknown-linux-gnu-freethreaded-install_only.tar.gz",
+            "cpython-3.15.2+20261110-aarch64-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.16.0a2+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.9.25+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz"));
+
+        ArchiveRelease release = await sources.LatestPython();
+
+        Assert.Equal("3.15.2", release.Version);
+        Assert.Equal("cpython-3.15.2+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz", release.FileName);
+        Assert.Equal("https://example.test/cpython-3.15.2+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz", release.Url);
+        Assert.Equal("abcd", release.Hash.Hex);
+        Assert.Equal("sha256", release.Hash.Algorithm);
+    }
+
+    [Fact]
+    public async Task LatestPython_NoStableArchive_Throws()
+    {
+        http.Setup(h => h.GetJson(It.IsAny<string>(), null, It.IsAny<CancellationToken>())).ReturnsAsync(PythonRelease("cpython-3.16.0a2+20261110-x86_64-unknown-linux-gnu-install_only.tar.gz"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sources.LatestPython());
+    }
+
+    [Fact]
+    public async Task LatestPython_ArchiveWithoutAChecksum_Throws()
+    {
+        http.Setup(h => h.GetJson(It.IsAny<string>(), null, It.IsAny<CancellationToken>())).ReturnsAsync(new JsonObject
+        {
+            ["assets"] = new JsonArray(new JsonObject { ["name"] = "cpython-3.15.2+1-x86_64-unknown-linux-gnu-install_only.tar.gz", ["browser_download_url"] = "https://example.test/x" }),
+        });
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => sources.LatestPython());
+
+        Assert.Contains("states no checksum", error.Message);
+    }
+
+    private void NodeIndex(string sums)
+    {
+        http.Setup(h => h.GetJson("https://nodejs.org/dist/index.json", null, It.IsAny<CancellationToken>())).ReturnsAsync(JsonNode.Parse("""
+            [
+              { "version": "v27.0.0-alpha.0.1.1", "files": ["linux-x64"] },
+              { "version": "v26.13.1", "files": ["linux-arm64", "linux-x64", "win-x64-zip"] },
+              { "version": "v26.13.0", "files": ["linux-x64"] },
+              { "version": "v27.0.0-rc.1", "files": ["linux-x64"] },
+              { "version": "v26.14.0", "files": ["win-x64-zip"] },
+              { "version": "v24.9.0", "files": ["linux-x64"] }
+            ]
+            """)!);
+        Page("https://nodejs.org/dist/v26.13.1/SHASUMS256.txt", sums);
+    }
+
+    [Fact]
+    public async Task LatestNode_TakesTheNewestStableReleaseWithALinuxX64ArchiveAndItsChecksum()
+    {
+        NodeIndex("1111  node-v26.13.1-linux-arm64.tar.xz\nABCDEF  node-v26.13.1-linux-x64.tar.xz\n2222  node-v26.13.1-linux-x64.tar.gz\n");
+
+        ArchiveRelease release = await sources.LatestNode();
+
+        Assert.Equal("26.13.1", release.Version);
+        Assert.Equal("node-v26.13.1-linux-x64.tar.xz", release.FileName);
+        Assert.Equal("https://nodejs.org/dist/v26.13.1/node-v26.13.1-linux-x64.tar.xz", release.Url);
+        Assert.Equal("abcdef", release.Hash.Hex);
+        Assert.Equal("sha256", release.Hash.Algorithm);
+    }
+
+    [Fact]
+    public async Task LatestNode_NoChecksumForTheArchive_Throws()
+    {
+        NodeIndex("1111  node-v26.13.1-linux-arm64.tar.xz\n");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sources.LatestNode());
+    }
 }

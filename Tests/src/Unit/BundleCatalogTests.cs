@@ -30,7 +30,7 @@ public sealed class BundleCatalogTests
 
         Assert.Equal(catalog.All.Count, catalog.All.Select(bundle => bundle.Name).Distinct().Count());
         Assert.Equal(
-            ["git", "a2000", "dotnet", "ollama", "vs-code", "gemma", "open-code", "xunit", "avalonia", "protobuf", "sqlite", "godot", "podman", "gimp", "krita", "blender", "auto-remote"],
+            ["git", "a2000", "dotnet", "ollama", "vs-code", "python", "node", "gemma", "chroma-db", "open-code", "xunit", "avalonia", "protobuf", "sqlite", "godot", "podman", "gimp", "krita", "libre-office", "blender", "xwayland", "virtual-testing", "auto-remote"],
             catalog.All.Select(bundle => bundle.Name));
         Assert.All(catalog.All, bundle => Assert.All(bundle.Requires, required => Assert.Contains(catalog.All, other => other.Name == required)));
         Assert.All(catalog.All, bundle => Assert.NotEmpty(bundle.Description));
@@ -40,6 +40,10 @@ public sealed class BundleCatalogTests
     [Theory]
     [InlineData("dotnet", new string[0])]
     [InlineData("ollama", new string[0])]
+    [InlineData("python", new string[0])]
+    [InlineData("node", new string[0])]
+    [InlineData("chroma-db", new[] { "ollama" })]
+    [InlineData("libre-office", new string[0])]
     [InlineData("open-code", new[] { "git" })]
     [InlineData("vs-code", new[] { "git", "dotnet", "ollama" })]
     [InlineData("gemma", new[] { "ollama" })]
@@ -48,6 +52,8 @@ public sealed class BundleCatalogTests
     [InlineData("gimp", new string[0])]
     [InlineData("krita", new string[0])]
     [InlineData("blender", new string[0])]
+    [InlineData("xwayland", new string[0])]
+    [InlineData("virtual-testing", new string[0])]
     [InlineData("auto-remote", new[] { "git", "dotnet", "ollama", "gemma", "open-code" })]
     public void RealBundles_NeedExactlyTheBundlesTheyUse(string name, string[] requires)
     {
