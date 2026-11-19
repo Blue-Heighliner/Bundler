@@ -53,23 +53,22 @@ internal sealed class BlenderBundle(IReleaseSources sources, IDownloads download
     }
 
     /// <inheritdoc />
-    public override Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         if (context.State.IsOwned("blender"))
         {
-            File.DeleteIfPresent("/usr/local/bin/blender");
-            File.DeleteIfPresent("/usr/share/applications/blender.desktop");
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
+            script.Remove("/usr/local/bin/blender");
+            script.Remove("/usr/share/applications/blender.desktop");
+            script.RemoveTree(root);
         }
         else
         {
-            log.Info("Blender was already on this computer and was not installed by this bundle, so it is left in place");
+            script.Info("Blender was already on this computer and was not installed by this bundle, so it is left in place");
         }
 
-        return aptInstaller.RemoveAdded(context.State, cancellation);
+        script.Add("apt-remove-added");
+        return script;
     }
 
     private async Task InstallBlender(InstallContext context, string version, CancellationToken cancellation)

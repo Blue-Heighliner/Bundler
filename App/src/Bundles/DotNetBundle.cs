@@ -81,25 +81,23 @@ internal sealed class DotNetBundle(
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         foreach (string user in context.Users.Where(user => Directory.Exists(users.Home(user))))
         {
-            RestoreNuGetConfig(Path.Combine(users.Home(user), ".nuget", "NuGet", "NuGet.Config"));
+            script.Add("restore-backup", Path.Combine(users.Home(user), ".nuget", "NuGet", "NuGet.Config"), "bundler");
         }
 
-        File.DeleteIfPresent(files.NuGetConfig);
-        DeleteIfEmpty(Path.GetDirectoryName(files.NuGetConfig)!);
-        DeleteIfEmpty(Path.GetDirectoryName(Path.GetDirectoryName(files.NuGetConfig)!)!);
-        if (Directory.Exists(feed.Directory))
-        {
-            Directory.Delete(feed.Directory, recursive: true);
-        }
-
-        DeleteIfEmpty(Path.GetDirectoryName(feed.Directory)!);
-        RemoveDotNet(context);
-        blocks.Remove("/etc/environment", "dotnet");
-        await aptInstaller.RemoveAdded(context.State, cancellation);
+        script.Remove(files.NuGetConfig);
+        script.RemoveEmpty(Path.GetDirectoryName(files.NuGetConfig)!);
+        script.RemoveEmpty(Path.GetDirectoryName(Path.GetDirectoryName(files.NuGetConfig)!)!);
+        script.RemoveTree(feed.Directory);
+        script.RemoveEmpty(Path.GetDirectoryName(feed.Directory)!);
+        AddDotNetRemoval(script, context);
+        script.Add("block-remove", "/etc/environment", "dotnet");
+        script.Add("apt-remove-added");
+        return script;
     }
 
     private async Task InstallDotNet(InstallContext context, CancellationToken cancellation)
@@ -209,76 +207,39 @@ internal sealed class DotNetBundle(
         await users.Own(user, [nuget], cancellation);
     }
 
-    private void RemoveDotNet(UninstallContext context)
+    private void AddDotNetRemoval(UninstallScript script, UninstallContext context)
     {
+        string dotnet = Path.Combine(files.Root, "dotnet");
         if (context.State.IsOwned("dotnet"))
         {
-            if (Directory.Exists(files.Root))
-            {
-                Directory.Delete(files.Root, recursive: true);
-            }
+            script.RemoveTree(files.Root);
         }
         else
         {
             foreach (string path in context.State.Lines("dotnet-added").Reverse())
             {
                 string full = Path.Combine(files.Root, path);
-                if (Directory.Exists(full))
-                {
-                    Directory.Delete(full, recursive: true);
-                }
-                else
-                {
-                    File.DeleteIfPresent(full);
-                }
-
-                for (string? parent = Path.GetDirectoryName(full); parent is not null && parent != files.Root && parent.StartsWith(files.Root, StringComparison.Ordinal); parent = Path.GetDirectoryName(parent))
-                {
-                    if (!Directory.Exists(parent) || Directory.EnumerateFileSystemEntries(parent).Any())
-                    {
-                        break;
-                    }
-
-                    Directory.Delete(parent);
-                }
+                script.Add("rm-path", full);
+                script.Add("rm-empty-parents", full, files.Root);
             }
 
             if (!context.State.Lines("dotnet-added").Any())
             {
-                log.Info(".NET was already on this computer and was not installed by this bundle, so it is left in place");
+                script.Info(".NET was already on this computer and was not installed by this bundle, so it is left in place");
             }
 
-            DeleteIfEmpty(files.Root);
+            script.RemoveEmpty(files.Root);
         }
 
         string? linked = context.State.Read("dotnet-link")?.Trim();
-        if (!string.IsNullOrEmpty(linked) && new FileInfo(linked).LinkTarget == Path.Combine(files.Root, "dotnet"))
+        if (!string.IsNullOrEmpty(linked))
         {
-            File.DeleteIfPresent(linked);
+            script.RemoveLink(linked, dotnet);
         }
-        else if (context.State.IsOwned("dotnet") && new FileInfo(files.Link).LinkTarget == Path.Combine(files.Root, "dotnet"))
-        {
-            File.DeleteIfPresent(files.Link);
-        }
-    }
 
-    private void RestoreNuGetConfig(string path)
-    {
-        if (File.Exists(path) && File.ReadAllText(path).Contains("bundler", StringComparison.Ordinal))
+        if (context.State.IsOwned("dotnet"))
         {
-            File.DeleteIfPresent(path);
-            if (File.Exists(path + ".bundler.bak"))
-            {
-                File.Move(path + ".bundler.bak", path);
-            }
-        }
-    }
-
-    private void DeleteIfEmpty(string folder)
-    {
-        if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any())
-        {
-            Directory.Delete(folder);
+            script.RemoveLink(files.Link, dotnet);
         }
     }
 }

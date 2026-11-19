@@ -3,6 +3,7 @@ namespace BlueHeighliner.Bundler.Tests;
 public sealed class ToolInstallerTests : IDisposable
 {
     private readonly TempDirectory directory = new();
+    private readonly UninstallHarness harness = new();
     private readonly Mock<IProcessRunner> runner = new();
     private readonly Mock<ILog> log = new();
     private readonly List<ProcessCommand> commands = [];
@@ -29,7 +30,17 @@ public sealed class ToolInstallerTests : IDisposable
     }
 
     public void Dispose()
-        => directory.Dispose();
+    {
+        harness.Dispose();
+        directory.Dispose();
+    }
+
+    private Task Uninstall()
+    {
+        UninstallScript script = new();
+        installer.Uninstall(script, state);
+        return harness.Run(state, script, "tool");
+    }
 
     private Dictionary<string, string> Links()
         => new() { ["tool"] = "bin/tool", ["helper"] = "bin/helper" };
@@ -130,7 +141,7 @@ public sealed class ToolInstallerTests : IDisposable
     {
         await installer.Install(state, "/x/a.tar.xz", root, "1.2.3", Links());
 
-        installer.Uninstall(state);
+        await Uninstall();
 
         Assert.False(File.Exists(Path.Combine(binaries, "tool")) || new FileInfo(Path.Combine(binaries, "tool")).LinkTarget is not null);
         Assert.False(Directory.Exists(Path.Combine(root, "1.2.3")));
@@ -143,7 +154,7 @@ public sealed class ToolInstallerTests : IDisposable
         Directory.CreateDirectory(Path.Combine(root, "0.9.0"));
         await installer.Install(state, "/x/a.tar.xz", root, "1.2.3", Links());
 
-        installer.Uninstall(state);
+        await Uninstall();
 
         Assert.True(Directory.Exists(Path.Combine(root, "0.9.0")));
     }
@@ -155,7 +166,7 @@ public sealed class ToolInstallerTests : IDisposable
         File.Delete(Path.Combine(binaries, "tool"));
         File.CreateSymbolicLink(Path.Combine(binaries, "tool"), "/usr/bin/something-else");
 
-        installer.Uninstall(state);
+        await Uninstall();
 
         Assert.Equal("/usr/bin/something-else", new FileInfo(Path.Combine(binaries, "tool")).LinkTarget);
     }
@@ -166,7 +177,7 @@ public sealed class ToolInstallerTests : IDisposable
         Directory.CreateDirectory(Path.Combine(root, "1.2.3"));
         state.Write("tool-folder", Path.Combine(root, "1.2.3"));
 
-        installer.Uninstall(state);
+        await Uninstall();
 
         Assert.True(Directory.Exists(Path.Combine(root, "1.2.3")));
     }

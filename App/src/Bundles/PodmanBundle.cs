@@ -44,19 +44,21 @@ internal sealed class PodmanBundle(IAptBuilder apt, IAptInstaller installer, IPr
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         foreach (string line in context.State.Lines("subids"))
         {
             string[] parts = line.Split(' ');
             if (parts.Length == 2 && int.TryParse(parts[1], out int start))
             {
-                await runner.Try("usermod", ["--del-subuids", $"{start}-{start + 65535}", "--del-subgids", $"{start}-{start + 65535}", parts[0]]);
+                script.Add("run", "usermod", "--del-subuids", $"{start}-{start + 65535}", "--del-subgids", $"{start}-{start + 65535}", parts[0]);
             }
         }
 
-        await installer.RemoveAdded(context.State, cancellation);
-        log.Warn("container images and volumes of each user stay in ~/.local/share/containers; delete that folder if you do not need them.");
+        script.Add("apt-remove-added");
+        script.Warn("container images and volumes of each user stay in ~/.local/share/containers; delete that folder if you do not need them.");
+        return script;
     }
 
     private async Task GiveRange(string user, IBundleState state, CancellationToken cancellation)

@@ -54,25 +54,18 @@ internal sealed class OpenCodeBundle(IReleaseSources sources, IDownloads downloa
     }
 
     /// <inheritdoc />
-    public override Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         if (!context.State.IsOwned("opencode"))
         {
-            log.Info("OpenCode was already on this computer and was not installed by this bundle, so it is left in place");
-            return Task.CompletedTask;
+            script.Info("OpenCode was already on this computer and was not installed by this bundle, so it is left in place");
+            return script;
         }
 
-        if (new FileInfo(files.Link).LinkTarget == files.Binary)
-        {
-            File.DeleteIfPresent(files.Link);
-        }
-
-        if (Directory.Exists(files.Root))
-        {
-            Directory.Delete(files.Root, recursive: true);
-        }
-
-        return Task.CompletedTask;
+        script.RemoveLink(files.Link, files.Binary);
+        script.RemoveTree(files.Root);
+        return script;
     }
 
     private async Task InstallFiles(InstallContext context, CancellationToken cancellation)

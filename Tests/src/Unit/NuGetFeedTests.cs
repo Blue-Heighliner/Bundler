@@ -3,6 +3,7 @@ namespace BlueHeighliner.Bundler.Tests;
 public sealed class NuGetFeedTests : IDisposable
 {
     private readonly TempDirectory directory = new();
+    private readonly UninstallHarness harness = new();
     private readonly Mock<IUsers> users = new();
     private readonly NuGetFeed feed;
 
@@ -14,7 +15,17 @@ public sealed class NuGetFeedTests : IDisposable
     }
 
     public void Dispose()
-        => directory.Dispose();
+    {
+        harness.Dispose();
+        directory.Dispose();
+    }
+
+    private Task Remove(BundleState state)
+    {
+        UninstallScript script = new();
+        script.Add("feed-remove", directory.Combine("feed"));
+        return harness.Run(state, script, "feed");
+    }
 
     private string Source(string name, params string[] packages)
     {
@@ -45,28 +56,28 @@ public sealed class NuGetFeedTests : IDisposable
     }
 
     [Fact]
-    public void Remove_KeepsAVersionAnotherBundleSharesUntilThatBundleIsRemoved()
+    public async Task Remove_KeepsAVersionAnotherBundleSharesUntilThatBundleIsRemoved()
     {
         BundleState first = State("xunit");
         BundleState second = State("avalonia");
         feed.Add(Source("a", "moq/4.0", "common/1.0"), first);
         feed.Add(Source("b", "common/1.0", "avalonia/12.0"), second);
 
-        feed.Remove(first);
+        await Remove(first);
 
         Assert.False(Directory.Exists(directory.Combine("feed", "moq")));
         Assert.True(Directory.Exists(directory.Combine("feed", "common", "1.0")));
         Assert.Equal(["avalonia/12.0", "common/1.0"], second.Lines("nuget-added").Order());
         Assert.Empty(second.Lines("nuget-shared"));
 
-        feed.Remove(second);
+        await Remove(second);
 
         Assert.False(Directory.Exists(directory.Combine("feed", "common")));
         Assert.False(Directory.Exists(directory.Combine("feed", "avalonia")));
     }
 
     [Fact]
-    public void Remove_VersionSharedByTwoOthers_PassesThroughBoth()
+    public async Task Remove_VersionSharedByTwoOthers_PassesThroughBoth()
     {
         BundleState a = State("a");
         BundleState b = State("b");
@@ -75,11 +86,11 @@ public sealed class NuGetFeedTests : IDisposable
         feed.Add(Source("sb", "common/1.0"), b);
         feed.Add(Source("sc", "common/1.0"), c);
 
-        feed.Remove(a);
-        feed.Remove(b);
+        await Remove(a);
+        await Remove(b);
         Assert.True(Directory.Exists(directory.Combine("feed", "common", "1.0")));
 
-        feed.Remove(c);
+        await Remove(c);
         Assert.False(Directory.Exists(directory.Combine("feed", "common")));
     }
 

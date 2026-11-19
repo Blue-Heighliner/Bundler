@@ -13,4 +13,7 @@ internal enum BundleStanding
 
     /// <summary>It is installed.</summary>
     Installed,
+
+    /// <summary>It is installed, but the bundle file in the Bundles folder was changed after the install.</summary>
+    Outdated,
 }

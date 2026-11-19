@@ -64,17 +64,19 @@ internal sealed class GemmaBundle(IOllamaRegistry registry, IOllamaModelFiles mo
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext uninstall, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext uninstall)
     {
-        string name = await modelFiles.Uninstall(uninstall.State, model, cancellation);
+        UninstallScript script = new();
+        string name = modelFiles.Uninstall(script, uninstall.State, model);
         foreach (string user in uninstall.Users.Where(user => Directory.Exists(users.Home(user))))
         {
-            await userFiles.UnsetJson(user, ClinePath(user), ClineSettings(name), cancellation);
+            script.Add("json-unset", user, ClinePath(user), ClineSettings(name).ToJsonString());
         }
 
-        File.DeleteIfPresent(dropIn);
-        await systemd.Reload(cancellation);
-        await systemd.Control("restart", "ollama", cancellation);
+        script.Remove(dropIn);
+        script.Add("daemon-reload");
+        script.Add("systemctl", "restart", "ollama");
+        return script;
     }
 
     private string ClinePath(string user)

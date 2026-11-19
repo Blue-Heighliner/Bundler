@@ -3,6 +3,7 @@ namespace BlueHeighliner.Bundler.Tests;
 public sealed class OpenCodeBundleTests : IDisposable
 {
     private readonly TempDirectory directory = new();
+    private readonly UninstallHarness harness = new();
     private readonly Mock<IReleaseSources> sources = new();
     private readonly Mock<IDownloads> downloads = new();
     private readonly Mock<IHttpFetcher> http = new();
@@ -35,7 +36,13 @@ public sealed class OpenCodeBundleTests : IDisposable
     }
 
     public void Dispose()
-        => directory.Dispose();
+    {
+        harness.Dispose();
+        directory.Dispose();
+    }
+
+    private Task Uninstall(UninstallContext context)
+        => harness.Run(state, bundle.Script(context), "open-code");
 
     private InstallContext Install()
         => new() { Payload = payload, State = state, Users = [], Info = new() { Name = "open-code", Components = ["OpenCode 2.2.5 (linux x64)"] } };
@@ -119,7 +126,7 @@ public sealed class OpenCodeBundleTests : IDisposable
     {
         await bundle.Install(Install());
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        await Uninstall(new() { State = state, Users = [] });
 
         Assert.False(Directory.Exists(files.Object.Root));
         Assert.False(File.Exists(files.Object.Link) || new FileInfo(files.Object.Link).LinkTarget is not null);
@@ -132,7 +139,7 @@ public sealed class OpenCodeBundleTests : IDisposable
         File.Delete(files.Object.Link);
         File.CreateSymbolicLink(files.Object.Link, "/somewhere/else");
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        await Uninstall(new() { State = state, Users = [] });
 
         Assert.Equal("/somewhere/else", new FileInfo(files.Object.Link).LinkTarget);
     }
@@ -144,7 +151,7 @@ public sealed class OpenCodeBundleTests : IDisposable
         directory.Write("opt/opencode", "theirs");
         await bundle.Install(Install());
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        await Uninstall(new() { State = state, Users = [] });
 
         Assert.Equal("theirs", File.ReadAllText(files.Object.Binary));
     }

@@ -25,15 +25,16 @@ internal sealed class BundleRowViewModel(BundleStatus status, IReadOnlyList<Serv
     /// <summary>Gets the services it installs.</summary>
     public IReadOnlyList<ServiceRow> Services { get; } = services;
 
-    /// <summary>Gets the name of the badge kind (<c>Missing</c>, <c>Available</c> or <c>Installed</c>), used to color it.</summary>
+    /// <summary>Gets the name of the badge kind (<c>Missing</c>, <c>Available</c>, <c>Installed</c> or <c>Outdated</c>), used to color it.</summary>
     public string Kind => status.State switch
     {
         BundleStanding.NotBuilt => "Missing",
         BundleStanding.Installed => "Installed",
+        BundleStanding.Outdated => "Outdated",
         _ => "Available",
     };
 
-    /// <summary>Gets the text of the badge: <c>missing</c> (no file in the Bundles folder), <c>available</c> (a file that is not installed yet) or <c>installed</c>.</summary>
+    /// <summary>Gets the text of the badge: <c>missing</c> (no file in the Bundles folder), <c>available</c> (a file that is not installed yet), <c>installed</c> or <c>outdated</c> (installed, but the file is newer than the install).</summary>
     public string Badge => Kind.ToLowerInvariant();
 
     /// <summary>

@@ -67,36 +67,4 @@ public sealed class JsonFilesTests
 
         Assert.Throws<InvalidOperationException>(() => json.Set(path, new() { ["a"] = 1 }));
     }
-
-    [Fact]
-    public void UnsetMatching_RemovesOnlyValuesStillAsSet()
-    {
-        using TempDirectory directory = new();
-        string path = directory.Write("s.json", "{ \"a\": 1, \"b\": 99, \"c\": 3 }");
-
-        Assert.True(json.UnsetMatching(path, new() { ["a"] = 1, ["b"] = 2 }));
-
-        JsonNode saved = JsonNode.Parse(File.ReadAllText(path))!;
-        Assert.Null(saved["a"]);
-        Assert.Equal(99, saved["b"]!.GetValue<int>());
-    }
-
-    [Fact]
-    public void UnsetMatching_EmptiedFile_IsDeleted()
-    {
-        using TempDirectory directory = new();
-        string path = directory.Write("s.json", "{ \"a\": 1 }");
-
-        json.UnsetMatching(path, new() { ["a"] = 1 });
-
-        Assert.False(File.Exists(path));
-    }
-
-    [Fact]
-    public void UnsetMatching_MissingFile_ReturnsFalse()
-    {
-        using TempDirectory directory = new();
-
-        Assert.False(json.UnsetMatching(directory.Combine("none.json"), new() { ["a"] = 1 }));
-    }
 }

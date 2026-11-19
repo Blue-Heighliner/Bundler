@@ -89,15 +89,19 @@ public sealed class VsCodeBundleTests : IDisposable
     }
 
     [Fact]
-    public async Task Uninstall_RemovesTheExtensionsTheBundleInstalled_AndTheSettings()
+    public async Task Script_RemovesTheExtensionsTheBundleInstalled_AndTheSettings()
     {
         await bundle.Install(Install("alice"));
         Directory.CreateDirectory(directory.Combine("home", "alice"));
 
-        await bundle.Uninstall(new() { State = state, Users = ["alice"] });
+        IReadOnlyList<string> lines = bundle.Script(new() { State = state, Users = ["alice"] }).Lines();
 
-        users.Verify(u => u.RunAs("alice", false, "code", It.Is<IReadOnlyList<string>>(arguments => arguments[0] == "--uninstall-extension" && arguments[1] == "saoudrizwan.claude-dev"), It.IsAny<CancellationToken>()), Times.Once);
-        users.Verify(u => u.RunAs("alice", false, "code", It.Is<IReadOnlyList<string>>(arguments => arguments[0] == "--uninstall-extension" && arguments[1] == "ms-dotnettools.csharp"), It.IsAny<CancellationToken>()), Times.Once);
-        aptInstaller.Verify(a => a.RemoveAdded(state, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Contains("run-as alice code --uninstall-extension saoudrizwan.claude-dev", lines);
+        Assert.Contains("run-as alice code --uninstall-extension ms-dotnettools.csharp", lines);
+        Assert.Contains($"rm-glob {directory.Combine("home", "alice", ".vscode", "extensions")} saoudrizwan.claude-dev-[0-9]*", lines);
+        Assert.Contains(lines, line => line.StartsWith($"json-unset alice {directory.Combine("home", "alice", ".config", "Code", "User", "settings.json")} {{", StringComparison.Ordinal));
+        Assert.Contains("git-unset init.defaultBranch main", lines);
+        Assert.Contains("git-unset core.editor code --wait", lines);
+        Assert.Equal("apt-remove-added", lines[^1]);
     }
 }

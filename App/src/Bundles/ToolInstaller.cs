@@ -27,10 +27,11 @@ internal interface IToolInstaller
     Task Install(IBundleState state, string archive, string root, string version, IReadOnlyDictionary<string, string> commands, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Removes the links and the version folder that <see cref="Install" /> made, and the program's folder when it is empty then.
+    /// Adds the steps that remove the links and the version folder that <see cref="Install" /> made, and the program's folder when it is empty then.
     /// </summary>
+    /// <param name="script">The uninstall script of the bundle.</param>
     /// <param name="state">The state of the bundle.</param>
-    void Uninstall(IBundleState state);
+    void Uninstall(UninstallScript script, IBundleState state);
 }
 
 /// <inheritdoc />
@@ -90,28 +91,23 @@ internal sealed class ToolInstaller(IProcessRunner runner, IVersions versions, I
     }
 
     /// <inheritdoc />
-    public void Uninstall(IBundleState state)
+    public void Uninstall(UninstallScript script, IBundleState state)
     {
         string? folder = state.Read("tool-folder")?.Trim();
-        foreach (string link in state.Lines("links"))
-        {
-            string? target = new FileInfo(link).LinkTarget;
-            if (target is not null && folder is not null && target.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            {
-                File.Delete(link);
-            }
-        }
-
-        if (!state.IsOwned("tool") || folder is null || !Directory.Exists(folder))
+        if (folder is null)
         {
             return;
         }
 
-        Directory.Delete(folder, recursive: true);
-        string root = Path.GetDirectoryName(folder)!;
-        if (Directory.Exists(root) && !Directory.EnumerateFileSystemEntries(root).Any())
+        foreach (string link in state.Lines("links"))
         {
-            Directory.Delete(root);
+            script.RemoveLink(link, folder);
+        }
+
+        if (state.IsOwned("tool"))
+        {
+            script.RemoveTree(folder);
+            script.RemoveEmpty(Path.GetDirectoryName(folder)!);
         }
     }
 }

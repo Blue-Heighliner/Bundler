@@ -4,7 +4,7 @@ Covers `IBundle` and its implementations, `BundleEngine`, `BundleArchive`, `Bund
 
 ## A bundle is a definition with three verbs
 
-An `IBundle` has a name, a description, a target (the system it is made for and has to be installed on, `Ubuntu 24.04` unless a bundle says otherwise), an order, the bundles it requires and three operations: `Build` (download into a folder and report its components), `Install` (given the unpacked payload, change the computer) and `Uninstall`. The NuGet-only bundles (`xunit`, `avalonia`, `protobuf`, `sqlite`) share `NuGetBundleBase` and differ only in their package list. `BundleCatalog` orders them by `Order`, which is also the order `build all` and requirement installs use.
+An `IBundle` has a name, a description, a target (the system it is made for and has to be installed on, `Ubuntu 24.04` unless a bundle says otherwise), an order, the bundles it requires and three operations: `Build` (download into a folder and report its components), `Install` (given the unpacked payload, change the computer) and `Script` (describe, from the install records, the steps that remove what the install did). The NuGet-only bundles (`xunit`, `avalonia`, `protobuf`, `sqlite`) share `NuGetBundleBase` and differ only in their package list. `BundleCatalog` orders them by `Order`, which is also the order `build all` and requirement installs use.
 
 ## The file
 
@@ -31,4 +31,4 @@ Install takes the file of the bundle. A bundle that is installed already is skip
 3. Per bundle: warn when the computer runs another system than the bundle's Target (from `/etc/os-release`), check free space in the unpack folder, extract with a path-safety check (entries that resolve outside the folder abort), verify every checksum, run the bundle's `Install`, record the accounts, delete the unpacked copy.
 4. A damaged file aborts before anything on the computer is changed.
 
-Uninstall refuses while an installed bundle requires the target, removes dependents first when several are named, runs the bundle's `Uninstall` and deletes its record.
+Uninstall refuses while an installed bundle requires the target, removes dependents first when several are named, runs the uninstall script the install recorded and deletes the bundle's records. The engine asks the bundle for its `Script` right after `Install` and stores the rendered bash script as `state/<bundle>/uninstall.sh` before the `installed` file is written, so an uninstall never consults the bundle file or the rules of the running Bundler: what the installed version recorded is what runs, and the script can be run by hand (`bash uninstall.sh`). An install made before scripts existed has none; the engine then builds one from the current rules, says so and stores it. A script that fails leaves the records in place so the uninstall can be repeated.

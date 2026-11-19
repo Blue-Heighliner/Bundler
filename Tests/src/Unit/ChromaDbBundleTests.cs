@@ -250,46 +250,48 @@ public sealed class ChromaDbBundleTests : IDisposable
     }
 
     [Fact]
-    public async Task Uninstall_RemovesTheServiceCommandAndEnvironmentAndKeepsTheData()
-    {
-        await bundle.Install(Install());
-        File.WriteAllText(Path.Combine(data, "chroma.sqlite3"), "data");
-
-        await bundle.Uninstall(Uninstall());
-
-        systemd.Verify(s => s.Control("disable --now", "chroma-db", It.IsAny<CancellationToken>()), Times.Once);
-        Assert.False(File.Exists(unit));
-        Assert.False(File.Exists(link) || new FileInfo(link).LinkTarget is not null);
-        Assert.False(Directory.Exists(root));
-        Assert.True(File.Exists(Path.Combine(data, "chroma.sqlite3")));
-        Assert.DoesNotContain(commands, command => command.FileName == "userdel");
-        log.Verify(l => l.Write(LogLevel.Warning, It.Is<string>(text => text.Contains("the chroma user is kept"))), Times.Once);
-        modelFiles.Verify(m => m.Uninstall(state, "nomic-embed-text:latest", It.IsAny<CancellationToken>()), Times.Once);
-        aptInstaller.Verify(i => i.RemoveAdded(state, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Uninstall_WithNoDataLeft_RemovesTheAccountItCreated()
+    public async Task Script_RemovesTheServiceCommandAndEnvironmentAndGuardsTheData()
     {
         await bundle.Install(Install());
 
-        await bundle.Uninstall(Uninstall());
+        IReadOnlyList<string> lines = bundle.Script(Uninstall()).Lines();
 
-        Assert.Contains(commands, command => command.FileName == "userdel" && command.Arguments.SequenceEqual(new[] { "chroma" }));
-        Assert.False(Directory.Exists(data));
+        Assert.Contains("systemctl disable --now chroma-db", lines);
+        Assert.Contains($"rm {unit}", lines);
+        Assert.Contains($"rm {link}", lines);
+        Assert.Contains($"rm-tree {root}", lines);
+        Assert.Contains($"if-files {data}", lines);
+        Assert.Contains($"if-no-files {data}", lines);
+        Assert.Contains("  run userdel chroma", lines);
+        Assert.Contains($"  rm-tree {data}", lines);
+        Assert.Contains(lines, line => line.StartsWith("  warn the ChromaDB data is still in", StringComparison.Ordinal));
+        modelFiles.Verify(m => m.Uninstall(It.IsAny<UninstallScript>(), state, "nomic-embed-text:latest"), Times.Once);
+        Assert.Equal("apt-remove-added", lines[^1]);
     }
 
     [Fact]
-    public async Task Uninstall_ChromaDbThatWasNotInstalledByTheBundle_IsLeftInPlace()
+    public async Task Script_WithTheAccountNotCreatedByTheBundle_KeepsTheAccountAndData()
+    {
+        await bundle.Install(Install());
+        File.Delete(Path.Combine(state.Directory, "owned-user"));
+
+        IReadOnlyList<string> lines = bundle.Script(Uninstall()).Lines();
+
+        Assert.DoesNotContain($"if-no-files {data}", lines);
+        Assert.DoesNotContain("  run userdel chroma", lines);
+    }
+
+    [Fact]
+    public async Task Script_ChromaDbThatWasNotInstalledByTheBundle_IsLeftInPlace()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(VenvPython)!);
         File.WriteAllText(VenvPython, string.Empty);
         chromaVersion = "9.0.0";
         await bundle.Install(Install());
 
-        await bundle.Uninstall(Uninstall());
+        IReadOnlyList<string> lines = bundle.Script(Uninstall()).Lines();
 
-        Assert.True(Directory.Exists(root));
-        log.Verify(l => l.Write(LogLevel.Info, It.Is<string>(text => text.Contains("was not installed by this bundle"))), Times.Once);
+        Assert.DoesNotContain($"rm-tree {root}", lines);
+        Assert.Contains(lines, line => line.StartsWith("info ChromaDB was already on this computer", StringComparison.Ordinal));
     }
 }

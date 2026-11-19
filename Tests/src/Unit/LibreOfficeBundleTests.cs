@@ -68,12 +68,12 @@ public sealed class LibreOfficeBundleTests : IDisposable
     }
 
     [Fact]
-    public async Task Uninstall_RemovesOnlyWhatTheBundleAdded()
+    public void Script_RemovesOnlyWhatTheBundleAdded()
     {
         BundleState state = new(directory.Combine("state"));
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        IReadOnlyList<string> lines = bundle.Script(new() { State = state, Users = [] }).Lines();
 
-        installer.Verify(i => i.RemoveAdded(state, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(["apt-remove-added"], lines);
     }
 }

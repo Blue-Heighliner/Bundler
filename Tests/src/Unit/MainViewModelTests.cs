@@ -63,6 +63,7 @@ public sealed class MainViewModelTests
     [InlineData("NotBuilt", "missing")]
     [InlineData("Available", "available")]
     [InlineData("Installed", "installed")]
+    [InlineData("Outdated", "outdated")]
     public void Row_ShowsTheBadge(string state, string badge)
     {
         BundleRowViewModel row = new(new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = Enum.Parse<BundleStanding>(state) }, [], false);

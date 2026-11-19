@@ -33,6 +33,32 @@ public sealed class StateStoreTests
     }
 
     [Fact]
+    public void Begin_RecordsWhenItWasInstalled()
+    {
+        using TempDirectory directory = new();
+        IBundleState state = Create(directory);
+        DateTime before = DateTime.Now.AddSeconds(-1);
+
+        state.Begin([]);
+
+        Assert.InRange(state.InstalledAt!.Value, before, DateTime.Now.AddSeconds(1));
+    }
+
+    [Fact]
+    public void InstalledAt_NotInstalledOrUnreadable_IsNull()
+    {
+        using TempDirectory directory = new();
+        IBundleState state = Create(directory);
+
+        Assert.Null(state.InstalledAt);
+
+        state.Begin([]);
+        File.WriteAllText(state.PathOf("installed"), "installed=garbage\n");
+
+        Assert.Null(state.InstalledAt);
+    }
+
+    [Fact]
     public void End_ForgetsEverything()
     {
         using TempDirectory directory = new();

@@ -114,33 +114,32 @@ internal sealed class VsCodeBundle(
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         string settings = context.State.Read("vscode-settings.json") ?? resources.Text("vs-code/vscode-settings.json");
         IReadOnlyList<string> installed = ExtensionRows(context.State.Directory).Select(row => row.Id).ToList();
         foreach (string user in context.Users.Where(user => Directory.Exists(users.Home(user))))
         {
-            log.Info($"user {user}");
             string home = users.Home(user);
             IReadOnlyList<string> owned = context.State.Lines($"extensions-owned-{user}");
+            script.Info($"user {user}");
             foreach (string id in installed.Reverse().Where(owned.Contains))
             {
-                await users.RunAs(user, false, "code", ["--uninstall-extension", id], cancellation);
-                string extensions = Path.Combine(home, ".vscode", "extensions");
-                foreach (string folder in Directory.Exists(extensions) ? Directory.EnumerateDirectories(extensions, $"{id}-[0-9]*") : [])
-                {
-                    Directory.Delete(folder, recursive: true);
-                }
+                script.Add("run-as", user, "code", "--uninstall-extension", id);
+                script.Add("rm-glob", Path.Combine(home, ".vscode", "extensions"), $"{id}-[0-9]*");
             }
 
-            await userFiles.UnsetJson(user, Path.Combine(home, ".config", "Code", "User", "settings.json"), (JsonObject)JsonNode.Parse(settings)!, cancellation);
-            await userFiles.UnsetJson(user, Path.Combine(home, ".cline", "data", "globalState.json"), clineState, cancellation);
-            await userFiles.UnsetJson(user, Path.Combine(home, ".cline", "data", "settings", "global-settings.json"), clineSettings, cancellation);
-            File.DeleteIfPresent(Path.Combine(home, "Documents", "Cline", "Rules", "offline-dotnet.md"));
+            script.Add("json-unset", user, Path.Combine(home, ".config", "Code", "User", "settings.json"), ((JsonObject)JsonNode.Parse(settings)!).ToJsonString());
+            script.Add("json-unset", user, Path.Combine(home, ".cline", "data", "globalState.json"), clineState.ToJsonString());
+            script.Add("json-unset", user, Path.Combine(home, ".cline", "data", "settings", "global-settings.json"), clineSettings.ToJsonString());
+            script.Remove(Path.Combine(home, "Documents", "Cline", "Rules", "offline-dotnet.md"));
         }
 
-        await UnsetGitDefaults(cancellation);
-        await aptInstaller.RemoveAdded(context.State, cancellation);
+        script.Add("git-unset", "init.defaultBranch", "main");
+        script.Add("git-unset", "core.editor", "code --wait");
+        script.Add("apt-remove-added");
+        return script;
     }
 
     private IEnumerable<(string Id, string Version, string File)> ExtensionRows(string stateDirectory)
@@ -173,23 +172,6 @@ internal sealed class VsCodeBundle(
         foreach ((string id, _, _) in ExtensionRows(context.State.Directory).Where(row => !present.Contains(row.Id, StringComparison.OrdinalIgnoreCase)))
         {
             log.Warn($"the VS Code extension {id} is not installed for {user}");
-        }
-    }
-
-    private async Task UnsetGitDefaults(CancellationToken cancellation)
-    {
-        if (machine.FindExecutable("git") is null)
-        {
-            return;
-        }
-
-        foreach ((string key, string value) in new[] { ("init.defaultBranch", "main"), ("core.editor", "code --wait") })
-        {
-            ProcessResult current = await runner.Try("git", ["config", "--system", "--get", key]);
-            if (current.Text == value)
-            {
-                await runner.Try("git", ["config", "--system", "--unset", key]);
-            }
         }
     }
 

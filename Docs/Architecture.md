@@ -26,7 +26,7 @@ A hand-written dependency walker would drift from NuGet's resolution rules. The 
 
 ## Installs only undo what they did
 
-Every install writes records under `state/<bundle>/` in root's app data folder: what apt added, which packages were added to the feed, which templates and extensions, which settings values. Uninstall removes exactly those, so a component that was kept because the computer already had a newer one stays. Settings files are edited by key and only removed when the value is still the one the bundle wrote.
+Every install writes records under `state/<bundle>/` in root's app data folder: what apt added, which packages were added to the feed, which templates and extensions, which settings values. Install also records the script that undoes it, `uninstall.sh`: a self-contained bash script (helper functions plus one call per step, JSON edits through the `python3` every Ubuntu desktop has) that depends on nothing of Bundler. The alternative, uninstall code in each bundle, would remove what the current rules say, which is wrong the moment a later build changes a path, a record name or a rule; a frozen script removes what the installed version did, whatever bundle file or Bundler build is around. Uninstall removes exactly those records, so a component that was kept because the computer already had a newer one stays. Settings files are edited by key and only removed when the value is still the one the bundle wrote.
 
 ## Licenses are part of the build
 

@@ -132,43 +132,39 @@ internal sealed class ChromaDbBundle(
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
-        await systemd.Control("disable --now", "chroma-db", cancellation);
-        File.DeleteIfPresent(unit);
-        await systemd.Reload(cancellation);
+        UninstallScript script = new();
+        script.Add("systemctl", "disable --now", "chroma-db");
+        script.Remove(unit);
+        script.Add("daemon-reload");
         if (context.State.IsOwned("link"))
         {
-            File.DeleteIfPresent(link);
+            script.Remove(link);
         }
 
         if (context.State.IsOwned("chroma"))
         {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
+            script.RemoveTree(root);
         }
         else
         {
-            log.Info("ChromaDB was already on this computer and was not installed by this bundle, so it is left in place");
+            script.Info("ChromaDB was already on this computer and was not installed by this bundle, so it is left in place");
         }
 
-        if (Directory.Exists(data) && Directory.EnumerateFileSystemEntries(data).Any())
+        script.IfFiles(true, [data], then => then.Warn($"the ChromaDB data is still in {data} (the chroma user is kept). Delete that folder by hand if you do not need it."));
+        if (context.State.IsOwned("user"))
         {
-            log.Warn($"the ChromaDB data is still in {data} (the chroma user is kept). Delete that folder by hand if you do not need it.");
-        }
-        else if (context.State.IsOwned("user"))
-        {
-            await runner.Try("userdel", ["chroma"]);
-            if (Directory.Exists(data))
+            script.IfFiles(false, [data], then =>
             {
-                Directory.Delete(data, recursive: true);
-            }
+                then.Add("run", "userdel", "chroma");
+                then.RemoveTree(data);
+            });
         }
 
-        await modelFiles.Uninstall(context.State, model, cancellation);
-        await aptInstaller.RemoveAdded(context.State, cancellation);
+        modelFiles.Uninstall(script, context.State, model);
+        script.Add("apt-remove-added");
+        return script;
     }
 
     private async Task<string?> InstalledVersion(CancellationToken cancellation)

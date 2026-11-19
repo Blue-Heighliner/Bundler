@@ -176,6 +176,8 @@
     <Style Selector="Border.badge[Tag=Available] TextBlock"><Setter Property="Foreground" Value="{DynamicResource StateAvailable}" /></Style>
     <Style Selector="Border.badge[Tag=Installed]"><Setter Property="Background" Value="#3373C991" /></Style>
     <Style Selector="Border.badge[Tag=Installed] TextBlock"><Setter Property="Foreground" Value="{DynamicResource GitAdded}" /></Style>
+    <Style Selector="Border.badge[Tag=Outdated]"><Setter Property="Background" Value="#33E2C08D" /></Style>
+    <Style Selector="Border.badge[Tag=Outdated] TextBlock"><Setter Property="Foreground" Value="{DynamicResource GitModified}" /></Style>
 
     <Style Selector="Border.topbar">
       <Setter Property="Background" Value="{DynamicResource Elevated}" />

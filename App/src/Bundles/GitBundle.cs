@@ -31,6 +31,10 @@ internal sealed class GitBundle(IAptBuilder apt, IAptInstaller installer, IProce
     }
 
     /// <inheritdoc />
-    public override Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
-        => installer.RemoveAdded(context.State, cancellation);
+    public override UninstallScript Script(UninstallContext context)
+    {
+        UninstallScript script = new();
+        script.Add("apt-remove-added");
+        return script;
+    }
 }

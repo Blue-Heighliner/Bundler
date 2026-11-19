@@ -35,6 +35,26 @@ public sealed class CommandLineTests
     }
 
     [Fact]
+    public async Task List_ShowsAnOutdatedBundleAndExplainsIt()
+    {
+        engine.Setup(e => e.List()).Returns([new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = BundleStanding.Outdated, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) }]);
+        StringWriter output = new();
+        TextWriter original = Console.Out;
+        Console.SetOut(output);
+        try
+        {
+            Assert.Equal(0, await commandLine.Run(["list"]));
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
+
+        Assert.Contains("outdated ", output.ToString());
+        Assert.Contains("outdated: installed, but a newer bundle file is there", output.ToString());
+    }
+
+    [Fact]
     public async Task Build_PassesTheNames()
     {
         Assert.Equal(0, await commandLine.Run(["build", "git", "dev"]));

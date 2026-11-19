@@ -100,34 +100,32 @@ internal sealed class GodotBundle(
     }
 
     /// <inheritdoc />
-    public override Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         if (context.State.IsOwned("godot"))
         {
             string templates = context.State.Read("templates-version")?.Trim() ?? string.Empty;
             foreach (string user in context.Users.Where(user => Directory.Exists(users.Home(user))))
             {
-                string link = Path.Combine(users.Home(user), ".local", "share", "godot", "export_templates", templates);
-                if (templates.Length > 0 && new FileInfo(link).LinkTarget is not null)
+                if (templates.Length > 0)
                 {
-                    File.DeleteIfPresent(link);
+                    script.RemoveLink(Path.Combine(users.Home(user), ".local", "share", "godot", "export_templates", templates));
                 }
             }
 
-            File.DeleteIfPresent("/usr/local/bin/godot");
-            File.DeleteIfPresent("/usr/share/applications/godot.desktop");
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
+            script.Remove("/usr/local/bin/godot");
+            script.Remove("/usr/share/applications/godot.desktop");
+            script.RemoveTree(root);
         }
         else
         {
-            log.Info("Godot was already on this computer and was not installed by this bundle, so it is left in place");
+            script.Info("Godot was already on this computer and was not installed by this bundle, so it is left in place");
         }
 
-        feed.Remove(context.State);
-        return aptInstaller.RemoveAdded(context.State, cancellation);
+        script.Add("feed-remove", feed.Directory);
+        script.Add("apt-remove-added");
+        return script;
     }
 
     private async Task InstallEditor(InstallContext context, string version, CancellationToken cancellation)

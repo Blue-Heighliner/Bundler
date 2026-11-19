@@ -13,13 +13,6 @@ internal interface ITextBlocks
     /// <param name="tag">Names the block.</param>
     /// <param name="lines">The lines inside the block.</param>
     void Add(string path, string tag, IEnumerable<string> lines);
-
-    /// <summary>
-    /// Takes a block out of a file.
-    /// </summary>
-    /// <param name="path">The file; nothing happens when it does not exist.</param>
-    /// <param name="tag">Names the block.</param>
-    void Remove(string path, string tag);
 }
 
 /// <inheritdoc />
@@ -36,8 +29,7 @@ internal sealed class TextBlocks : ITextBlocks
         File.WriteAllLines(path, content);
     }
 
-    /// <inheritdoc />
-    public void Remove(string path, string tag)
+    private void Remove(string path, string tag)
     {
         if (!File.Exists(path))
         {

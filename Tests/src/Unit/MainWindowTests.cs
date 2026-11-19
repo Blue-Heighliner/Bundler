@@ -5,9 +5,9 @@ public sealed class MainWindowTests
     private readonly Mock<IMainViewModel> model = new();
     private readonly Mock<IDialogs> dialogs = new();
 
-    private MainWindow Show()
+    private MainWindow Show(BundleStanding state = BundleStanding.Available)
     {
-        BundleRowViewModel row = new BundleRowViewModel(new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = BundleStanding.Available, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) }, [new ServiceRow("git", "2.56.0", "Source control", ["GPL-2.0", "MIT"], "Clear.")], false);
+        BundleRowViewModel row = new BundleRowViewModel(new BundleStatus { Name = "git", Description = "Git", Target = "Ubuntu 24.04", Requires = [], State = state, FileModified = new DateTime(2026, 10, 30, 9, 19, 0) }, [new ServiceRow("git", "2.56.0", "Source control", ["GPL-2.0", "MIT"], "Clear.")], false);
         model.SetupGet(m => m.Bundles).Returns([row]);
         model.SetupGet(m => m.Current).Returns(row);
         model.SetupGet(m => m.HasCurrent).Returns(true);
@@ -21,6 +21,19 @@ public sealed class MainWindowTests
 
     private static Button FindButton(MainWindow window, string name)
         => window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == name);
+
+    [AvaloniaFact]
+    public void Window_ShowsAnOutdatedBundleWithItsOwnBadgeColor()
+    {
+        MainWindow window = Show(BundleStanding.Outdated);
+        window.UpdateLayout();
+
+        Border badge = window.GetVisualDescendants().OfType<Border>().First(border => border.Classes.Contains("badge"));
+        Assert.Equal("Outdated", badge.Tag);
+        Assert.Equal(Color.Parse("#33E2C08D"), ((ISolidColorBrush)badge.Background!).Color);
+        Assert.Equal(Color.Parse("#E2C08D"), ((ISolidColorBrush)badge.GetVisualDescendants().OfType<TextBlock>().First().Foreground!).Color);
+        Assert.Contains("outdated", window.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text));
+    }
 
     [AvaloniaFact]
     public void Window_ShowsTheBundleRows()

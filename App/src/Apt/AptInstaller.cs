@@ -32,23 +32,12 @@ internal interface IAptInstaller
     /// <param name="cancellation">Stops the work when cancelled.</param>
     /// <returns>The packages that were removed; empty when none matched.</returns>
     Task<IReadOnlyList<string>> RemoveInstalled(string pattern, CancellationToken cancellation = default);
-
-    /// <summary>
-    /// Removes the packages an install added, those that nothing else needs any more (including ones requested by name such
-    /// as zstd). Apt never removes kernels by itself, so kernel packages on the list go too, except the running kernel. A package that something else still needs stays, and is remembered in <c>apt-leftover</c> next to the bundles' records, so whichever uninstall comes after that other thing is gone removes it too.
-    /// </summary>
-    /// <param name="state">The bundle's installed-state records.</param>
-    /// <param name="cancellation">Stops the work when cancelled.</param>
-    /// <returns>A task that completes when the packages are removed.</returns>
-    Task RemoveAdded(IBundleState state, CancellationToken cancellation = default);
 }
 
 /// <inheritdoc />
-internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex index, IVersions versions, ILog log) : IAptInstaller
+internal sealed class AptInstaller(IProcessRunner runner, IDebIndex index, IVersions versions, ILog log) : IAptInstaller
 {
     private static readonly string recordFile = "apt-new";
-
-    private static readonly string leftoverName = "apt-leftover";
 
     private static readonly Dictionary<string, string?> noninteractive = new() { ["DEBIAN_FRONTEND"] = "noninteractive" };
 
@@ -109,92 +98,6 @@ internal sealed partial class AptInstaller(IProcessRunner runner, IDebIndex inde
         }
 
         return names;
-    }
-
-    /// <inheritdoc />
-    public async Task RemoveAdded(IBundleState state, CancellationToken cancellation = default)
-    {
-        string running = File.ReadAllText("/proc/sys/kernel/osrelease").Trim();
-        string leftoverFile = Path.Combine(Path.GetDirectoryName(state.Directory.TrimEnd(Path.DirectorySeparatorChar))!, leftoverName);
-        List<string> candidates = [.. state.Lines(recordFile), .. File.Exists(leftoverFile) ? File.ReadAllLines(leftoverFile) : []];
-        candidates = [.. candidates.Where(package => package.Length > 0).Distinct()];
-        for (int pass = 0; pass < 4; pass++)
-        {
-            List<string> present = await Installed(candidates, cancellation);
-            if (present.Count == 0)
-            {
-                break;
-            }
-
-            await runner.Run(new() { FileName = "apt-mark", Arguments = ["auto", .. present], Check = false }, cancellation);
-            ProcessResult simulation = await runner.Run(
-                new() { FileName = "apt-get", Arguments = ["-s", "-o", "APT::AutoRemove::RecommendsImportant=false", "-o", "APT::AutoRemove::SuggestsImportant=false", "autoremove"], Check = false },
-                cancellation);
-            HashSet<string> removable = RemovePattern().Matches(simulation.Output).Select(match => match.Groups["name"].Value).ToHashSet();
-            List<string> remove = present
-                .Where(package => (removable.Contains(package) || KernelPattern().IsMatch(package)) && !package.Contains(running, StringComparison.Ordinal))
-                .Distinct().Order(StringComparer.Ordinal).ToList();
-            if (remove.Count == 0)
-            {
-                remove = await RemovableAlone(present, running, cancellation);
-            }
-
-            if (remove.Count == 0)
-            {
-                break;
-            }
-
-            await runner.Run(new() { FileName = "apt-get", Arguments = ["remove", "-y", "--purge", .. remove], Environment = noninteractive, StreamOutput = true, Check = false }, cancellation);
-        }
-
-        List<string> remaining = await Installed(candidates, cancellation);
-        if (remaining.Count == 0)
-        {
-            File.Delete(leftoverFile);
-        }
-        else
-        {
-            await File.WriteAllLinesAsync(leftoverFile, remaining, cancellation);
-        }
-    }
-
-    [GeneratedRegex(@"^Remv (?<name>\S+)", RegexOptions.Multiline)]
-    private static partial Regex RemovePattern();
-
-    [GeneratedRegex(@"^linux-.*-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-[a-z0-9]+$")]
-    private static partial Regex KernelPattern();
-
-    private async Task<List<string>> RemovableAlone(List<string> present, string running, CancellationToken cancellation)
-    {
-        HashSet<string> own = [.. present.Select(Plain)];
-        List<string> alone = [];
-        foreach (string package in present.Where(package => !package.Contains(running, StringComparison.Ordinal)))
-        {
-            ProcessResult simulation = await runner.Run(new() { FileName = "apt-get", Arguments = ["-s", "remove", package], Check = false }, cancellation);
-            if (simulation.Success && RemovePattern().Matches(simulation.Output).Select(match => Plain(match.Groups["name"].Value)).All(own.Contains))
-            {
-                alone.Add(package);
-            }
-        }
-
-        return [.. alone.Order(StringComparer.Ordinal)];
-    }
-
-    private string Plain(string name)
-        => name.Split(':')[0];
-
-    private async Task<List<string>> Installed(IEnumerable<string> packages, CancellationToken cancellation)
-    {
-        List<string> installed = [];
-        foreach (string package in packages)
-        {
-            if (await InstalledVersion(package, cancellation) is not null)
-            {
-                installed.Add(package);
-            }
-        }
-
-        return installed;
     }
 
     private IReadOnlyList<string> Names(string directory, string file)

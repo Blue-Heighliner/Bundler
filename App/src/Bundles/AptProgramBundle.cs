@@ -33,6 +33,10 @@ internal abstract class AptProgramBundle(IAptBuilder apt, IAptInstaller installe
     }
 
     /// <inheritdoc />
-    public override Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
-        => installer.RemoveAdded(context.State, cancellation);
+    public override UninstallScript Script(UninstallContext context)
+    {
+        UninstallScript script = new();
+        script.Add("apt-remove-added");
+        return script;
+    }
 }

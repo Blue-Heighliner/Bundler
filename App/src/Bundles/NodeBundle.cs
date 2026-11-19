@@ -50,14 +50,15 @@ internal sealed class NodeBundle(IReleaseSources sources, IDownloads downloads, 
     }
 
     /// <inheritdoc />
-    public override Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         if (!context.State.IsOwned("tool"))
         {
-            log.Info("Node.js was already on this computer and was not installed by this bundle, so it is left in place");
+            script.Info("Node.js was already on this computer and was not installed by this bundle, so it is left in place");
         }
 
-        tool.Uninstall(context.State);
-        return Task.CompletedTask;
+        tool.Uninstall(script, context.State);
+        return script;
     }
 }

@@ -75,18 +75,21 @@ internal sealed partial class A2000Bundle(IReleaseSources sources, IAptBuilder a
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
-        if (!context.State.IsOwned("driver"))
-        {
-            log.Info("the NVIDIA driver was already on this computer and was not installed by this bundle, so it is left in place");
-        }
-
-        await installer.RemoveAdded(context.State, cancellation);
+        UninstallScript script = new();
         if (context.State.IsOwned("driver"))
         {
-            log.Warn("restart the computer to unload the driver (the display falls back to the open nouveau driver).");
+            script.Add("apt-remove-added");
+            script.Warn("restart the computer to unload the driver (the display falls back to the open nouveau driver).");
         }
+        else
+        {
+            script.Info("the NVIDIA driver was already on this computer and was not installed by this bundle, so it is left in place");
+            script.Add("apt-remove-added");
+        }
+
+        return script;
     }
 
     private string ModulesKernel(InstallContext context)

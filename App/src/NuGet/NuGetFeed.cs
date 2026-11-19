@@ -23,13 +23,6 @@ internal interface INuGetFeed
     (int Added, int Total) Add(string source, IBundleState state);
 
     /// <summary>
-    /// Removes the package versions this bundle added. One that another installed bundle shares is handed over to that bundle
-    /// and stays until it is uninstalled too.
-    /// </summary>
-    /// <param name="state">The bundle's installed-state records.</param>
-    void Remove(IBundleState state);
-
-    /// <summary>
     /// Writes a <c>NuGet.Config</c> that uses only the offline feed.
     /// </summary>
     /// <param name="path">The file to write.</param>
@@ -60,15 +53,6 @@ internal interface INuGetFeed
     /// <param name="cancellation">Stops the work when cancelled.</param>
     /// <returns><see langword="true" /> when it was installed.</returns>
     Task<bool> InstallTemplate(string user, string nupkg, CancellationToken cancellation = default);
-
-    /// <summary>
-    /// Removes a template pack from a user.
-    /// </summary>
-    /// <param name="user">The account.</param>
-    /// <param name="id">The template pack id.</param>
-    /// <param name="cancellation">Stops the work when cancelled.</param>
-    /// <returns>A task that completes when the pack is removed.</returns>
-    Task UninstallTemplate(string user, string id, CancellationToken cancellation = default);
 }
 
 /// <inheritdoc />
@@ -116,30 +100,6 @@ internal sealed class NuGetFeed(IPaths paths, IUsers users, IVersions versions) 
 
         MakeReadable(paths.NuGetFeed);
         return (added, packages.Length);
-    }
-
-    /// <inheritdoc />
-    public void Remove(IBundleState state)
-    {
-        foreach (string relative in state.Lines(recordFile))
-        {
-            if (HandOver(relative, state))
-            {
-                continue;
-            }
-
-            string target = Path.Combine(paths.NuGetFeed, relative);
-            if (System.IO.Directory.Exists(target))
-            {
-                System.IO.Directory.Delete(target, recursive: true);
-            }
-
-            string? parent = Path.GetDirectoryName(target);
-            if (parent is not null && System.IO.Directory.Exists(parent) && !System.IO.Directory.EnumerateFileSystemEntries(parent).Any())
-            {
-                System.IO.Directory.Delete(parent);
-            }
-        }
     }
 
     /// <inheritdoc />
@@ -203,10 +163,6 @@ internal sealed class NuGetFeed(IPaths paths, IUsers users, IVersions versions) 
             staged.Delete(recursive: true);
         }
     }
-
-    /// <inheritdoc />
-    public async Task UninstallTemplate(string user, string id, CancellationToken cancellation = default)
-        => await users.RunAs(user, false, "dotnet", ["new", "uninstall", id], cancellation);
 
     private bool HandOver(string relative, IBundleState state)
     {

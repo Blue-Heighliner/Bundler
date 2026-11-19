@@ -238,56 +238,56 @@ public sealed class AutoRemoteBundleTests : IDisposable
     }
 
     [Fact]
-    public async Task Uninstall_RemovesTheServiceTheProgramsAndTheEntry_ButKeepsTheConfigAndData()
+    public async Task Script_RemovesTheServiceTheProgramsAndTheEntry_ButKeepsTheConfigAndData()
     {
         await bundle.Install(Install("alice"));
-        directory.Write("home/alice/.local/share/AutoRemote/workspaces.json", "{}");
 
-        await bundle.Uninstall(new() { State = state, Users = ["alice"] });
+        IReadOnlyList<string> lines = bundle.Script(new() { State = state, Users = ["alice"] }).Lines();
 
-        Assert.False(File.Exists(Home("alice", ".config", "systemd", "user", "auto-remote.service")));
-        Assert.False(Directory.Exists(Home("alice", ".config", "systemd")));
-        Assert.True(File.Exists(Home("alice", ".config", "auto-remote", "config.json")));
-        Assert.True(File.Exists(Home("alice", ".local", "share", "AutoRemote", "workspaces.json")));
-        Assert.False(Directory.Exists(files.Object.Root));
-        Assert.False(File.Exists(files.Object.Icon));
-        Assert.False(File.Exists(files.Object.DesktopEntry));
-        Assert.True(Ran("loginctl", "disable-linger", "alice"));
-        aptInstaller.Verify(a => a.RemoveAdded(state, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Contains($"rm {Home("alice", ".config", "systemd", "user", "auto-remote.service")}", lines);
+        Assert.Contains($"rm-empty {Home("alice", ".config", "systemd")}", lines);
+        Assert.Contains($"rm-tree {files.Object.Root}", lines);
+        Assert.Contains($"rm {files.Object.Icon}", lines);
+        Assert.Contains($"rm {files.Object.DesktopEntry}", lines);
+        Assert.Contains("disable-linger alice", lines);
+        Assert.Contains("apt-remove-added", lines);
+        Assert.DoesNotContain(lines, line => line.StartsWith("rm", StringComparison.Ordinal) && (line.Contains("config.json") || line.Contains(".local/share/AutoRemote")));
     }
 
     [Fact]
-    public async Task Uninstall_WithSystemdRunning_StopsAndDisablesTheServiceFirst()
+    public async Task Script_StopsAndDisablesTheServiceFirstWhenSystemdRuns()
     {
-        systemd.SetupGet(s => s.IsRunning).Returns(true);
         await bundle.Install(Install("alice"));
 
-        await bundle.Uninstall(new() { State = state, Users = ["alice"] });
+        IReadOnlyList<string> lines = bundle.Script(new() { State = state, Users = ["alice"] }).Lines();
 
-        Assert.True(Ran("systemctl", "--user", "alice@.host", "disable", "--now", "auto-remote.service"));
+        Assert.Equal("if-systemd", lines[0]);
+        Assert.Equal("  run systemctl --user -M alice@.host disable --now auto-remote.service", lines[1]);
     }
 
     [Fact]
-    public async Task Uninstall_ProgramsThatWereThereBefore_AreLeftInPlace()
+    public async Task Script_ProgramsThatWereThereBefore_AreLeftInPlace()
     {
         directory.Write("opt/version.txt", "1.2.0");
         directory.Write("opt/server/Markwardt.AutoRemote.Server", "theirs");
         await bundle.Install(Install("alice"));
 
-        await bundle.Uninstall(new() { State = state, Users = ["alice"] });
+        IReadOnlyList<string> lines = bundle.Script(new() { State = state, Users = ["alice"] }).Lines();
 
-        Assert.Equal("theirs", File.ReadAllText(files.Object.Server));
+        Assert.DoesNotContain($"rm-tree {files.Object.Root}", lines);
+        Assert.Contains(lines, line => line.StartsWith("info Auto Remote was already on this computer", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task Uninstall_ForAUserThatNoLongerExists_DoesNotFail()
+    public async Task Script_ForAUserThatNoLongerExists_HasNoStepsForThem()
     {
         await bundle.Install(Install("alice"));
         users.Setup(u => u.Home("alice")).Throws(new InvalidOperationException("no such user: alice"));
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        IReadOnlyList<string> lines = bundle.Script(new() { State = state, Users = [] }).Lines();
 
-        Assert.False(Directory.Exists(files.Object.Root));
+        Assert.DoesNotContain(lines, line => line.Contains("alice@.host"));
+        Assert.Contains($"rm-tree {files.Object.Root}", lines);
     }
 
     [Fact]
@@ -296,7 +296,6 @@ public sealed class AutoRemoteBundleTests : IDisposable
         await bundle.Install(Install("alice"));
         files.Setup(f => f.NewKey()).Returns("ANOTHER");
 
-        await bundle.Uninstall(new() { State = state, Users = ["alice"] });
         state.End();
         await bundle.Install(Install("alice"));
 

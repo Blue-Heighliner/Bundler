@@ -40,9 +40,11 @@ internal sealed class SqliteBundle(INuGetBundleBuilder builder, INuGetBundleInst
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
-        await installer.Uninstall(context, cancellation);
-        await aptInstaller.RemoveAdded(context.State, cancellation);
+        UninstallScript script = new();
+        installer.Uninstall(script, context);
+        script.Add("apt-remove-added");
+        return script;
     }
 }

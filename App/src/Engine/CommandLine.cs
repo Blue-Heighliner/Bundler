@@ -154,11 +154,12 @@ internal sealed class CommandLine(IBundleEngine engine, IByteSizes sizes, ILog l
             {
                 BundleStanding.NotBuilt => "not built",
                 BundleStanding.Available => "available",
+                BundleStanding.Outdated => "outdated",
                 _ => "installed",
             };
             Console.Out.WriteLine($"{row.Name.PadRight(name)} {state,-10} {row.Target.PadRight(target)} {modified[index].PadRight(file)} {(row.Requires.Count > 0 ? string.Join(',', row.Requires) : "-"),-6} {row.Description}");
         }
 
-        Console.Out.WriteLine("\ninstalled: on this computer   available: built, ready to install   not built: run \"build <name>\" on an online computer\n");
+        Console.Out.WriteLine("\ninstalled: on this computer   outdated: installed, but a newer bundle file is there (reinstall)   available: built, ready to install   not built: run \"build <name>\" on an online computer\n");
     }
 }

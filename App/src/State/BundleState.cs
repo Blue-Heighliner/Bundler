@@ -12,6 +12,9 @@ internal interface IBundleState
     /// <summary>Gets a value indicating whether an install of this bundle finished.</summary>
     bool IsInstalled { get; }
 
+    /// <summary>Gets when the install was recorded, or <see langword="null" /> when it is not installed or the time is not readable.</summary>
+    DateTime? InstalledAt { get; }
+
     /// <summary>Gets the accounts the bundle was installed for.</summary>
     IReadOnlyList<string> Users { get; }
 
@@ -81,6 +84,9 @@ internal sealed class BundleState(string directory) : IBundleState
 
     /// <inheritdoc />
     public bool IsInstalled => File.Exists(PathOf("installed"));
+
+    /// <inheritdoc />
+    public DateTime? InstalledAt => DateTimeOffset.TryParse(Field("installed"), System.Globalization.CultureInfo.InvariantCulture, out DateTimeOffset time) ? time.LocalDateTime : null;
 
     /// <inheritdoc />
     public IReadOnlyList<string> Users => (Field("users") ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);

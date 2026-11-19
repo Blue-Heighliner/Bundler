@@ -93,38 +93,36 @@ internal sealed class AutoRemoteBundle(
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
+        UninstallScript script = new();
         foreach (string user in context.State.Lines("service-users"))
         {
             if (HomeOf(user) is string home && Directory.Exists(home))
             {
-                await RemoveUser(user, home);
+                AddUserRemoval(script, user, home);
             }
         }
 
         foreach (string user in context.State.Lines("linger-users"))
         {
-            await DisableLinger(user);
+            script.Add("disable-linger", user);
         }
 
         if (context.State.IsOwned("auto-remote"))
         {
-            File.DeleteIfPresent(files.DesktopEntry);
-            File.DeleteIfPresent(files.Icon);
-            if (Directory.Exists(files.Root))
-            {
-                Directory.Delete(files.Root, recursive: true);
-            }
-
-            await runner.Try("update-desktop-database", ["/usr/share/applications"]);
+            script.Remove(files.DesktopEntry);
+            script.Remove(files.Icon);
+            script.RemoveTree(files.Root);
+            script.Add("run", "update-desktop-database", "/usr/share/applications");
         }
         else
         {
-            log.Info("Auto Remote was already on this computer and was not installed by this bundle, so it is left in place");
+            script.Info("Auto Remote was already on this computer and was not installed by this bundle, so it is left in place");
         }
 
-        await aptInstaller.RemoveAdded(context.State, cancellation);
+        script.Add("apt-remove-added");
+        return script;
     }
 
     private async Task InstallFiles(InstallContext context, string bundled, CancellationToken cancellation)
@@ -238,30 +236,19 @@ internal sealed class AutoRemoteBundle(
         }
     }
 
-    private async Task RemoveUser(string user, string home)
+    private void AddUserRemoval(UninstallScript script, string user, string home)
     {
-        if (systemd.IsRunning)
-        {
-            await runner.Try("systemctl", ["--user", "-M", $"{user}@.host", "disable", "--now", "auto-remote.service"]);
-        }
-
+        script.IfSystemd(then => then.Add("run", "systemctl", "--user", "-M", $"{user}@.host", "disable", "--now", "auto-remote.service"));
         string unitFolder = Path.Combine(home, ".config", "systemd", "user");
-        File.DeleteIfPresent(Path.Combine(unitFolder, "default.target.wants", "auto-remote.service"));
-        File.DeleteIfPresent(Path.Combine(unitFolder, "auto-remote.service"));
+        script.Remove(Path.Combine(unitFolder, "default.target.wants", "auto-remote.service"));
+        script.Remove(Path.Combine(unitFolder, "auto-remote.service"));
         foreach (string folder in new[] { Path.Combine(unitFolder, "default.target.wants"), unitFolder, Path.GetDirectoryName(unitFolder)! })
         {
-            if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any())
-            {
-                Directory.Delete(folder);
-            }
+            script.RemoveEmpty(folder);
         }
 
-        if (systemd.IsRunning)
-        {
-            await runner.Try("systemctl", ["--user", "-M", $"{user}@.host", "daemon-reload"]);
-        }
-
-        log.Info($"user {user}: the service is removed; {Path.Combine(home, ".config", "auto-remote", "config.json")} and the data in {Path.Combine(home, ".local", "share", "AutoRemote")} are kept");
+        script.IfSystemd(then => then.Add("run", "systemctl", "--user", "-M", $"{user}@.host", "daemon-reload"));
+        script.Info($"user {user}: the service is removed; {Path.Combine(home, ".config", "auto-remote", "config.json")} and the data in {Path.Combine(home, ".local", "share", "AutoRemote")} are kept");
     }
 
     private string? HomeOf(string user)
@@ -273,14 +260,6 @@ internal sealed class AutoRemoteBundle(
         catch (InvalidOperationException)
         {
             return null;
-        }
-    }
-
-    private async Task DisableLinger(string user)
-    {
-        if (!(await runner.Try("loginctl", ["disable-linger", user])).Success)
-        {
-            File.DeleteIfPresent(Path.Combine("/var/lib/systemd/linger", user));
         }
     }
 }

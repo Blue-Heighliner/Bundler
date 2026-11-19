@@ -16,13 +16,13 @@ internal interface IOllamaModelFiles
     Task<string> Install(InstallContext install, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Takes the model out of Ollama's folder, unless it was there before the bundle and is not the bundle's to remove.
+    /// Adds the steps that take the model out of Ollama's folder to an uninstall script, unless it was there before the bundle and is not the bundle's to remove.
     /// </summary>
+    /// <param name="script">The uninstall script of the bundle.</param>
     /// <param name="state">The state of the bundle.</param>
     /// <param name="fallbackName">The name to report when the state has none.</param>
-    /// <param name="cancellation">Stops the work when cancelled.</param>
     /// <returns>The name of the model.</returns>
-    Task<string> Uninstall(IBundleState state, string fallbackName, CancellationToken cancellation = default);
+    string Uninstall(UninstallScript script, IBundleState state, string fallbackName);
 
     /// <summary>
     /// Waits for Ollama to list a model. Does nothing when systemd is not running, because Ollama starts at the next boot then.
@@ -82,7 +82,7 @@ internal sealed class OllamaModelFiles(IHashing hashing, ISystemd systemd, IProc
     }
 
     /// <inheritdoc />
-    public Task<string> Uninstall(IBundleState state, string fallbackName, CancellationToken cancellation = default)
+    public string Uninstall(UninstallScript script, IBundleState state, string fallbackName)
     {
         string name = state.Read("model")?.Trim() ?? fallbackName;
         string? manifest = state.Read("manifest")?.Trim();
@@ -90,18 +90,15 @@ internal sealed class OllamaModelFiles(IHashing hashing, ISystemd systemd, IProc
         {
             if (!string.IsNullOrEmpty(manifest))
             {
-                log.Info($"{name} was already on this computer and was not installed by this bundle, so it is left in place");
+                script.Info($"{name} was already on this computer and was not installed by this bundle, so it is left in place");
             }
         }
-        else if (!string.IsNullOrEmpty(manifest) && File.Exists(manifest))
+        else if (!string.IsNullOrEmpty(manifest))
         {
-            string[] digests = Digests(File.ReadAllText(manifest)).ToArray();
-            File.DeleteIfPresent(manifest);
-            File.DeleteIfPresent(Path.Combine(models, "manifests-v2", Path.GetRelativePath(Path.Combine(models, "manifests"), manifest)));
-            RemoveUnused(digests);
+            script.Add("model-remove", models, manifest);
         }
 
-        return Task.FromResult(name);
+        return name;
     }
 
     /// <inheritdoc />

@@ -23,6 +23,10 @@ internal abstract class NuGetBundleBase(INuGetBundleBuilder builder, INuGetBundl
         => installer.Install(Spec, context, cancellation);
 
     /// <inheritdoc />
-    public override Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
-        => installer.Uninstall(context, cancellation);
+    public override UninstallScript Script(UninstallContext context)
+    {
+        UninstallScript script = new();
+        installer.Uninstall(script, context);
+        return script;
+    }
 }

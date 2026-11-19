@@ -10,6 +10,8 @@ public sealed class BundleEngineTests : IDisposable
     private readonly Mock<IUsers> users = new();
     private readonly Mock<IPaths> paths = new();
     private readonly Mock<IMachine> machine = new();
+    private readonly Mock<IProcessRunner> runner = new();
+    private readonly Mock<IResources> resources = new();
     private readonly Mock<ILog> log = new();
     private readonly Mock<IBundle> git = new();
     private readonly Mock<IBundle> dev = new();
@@ -45,11 +47,33 @@ public sealed class BundleEngineTests : IDisposable
         machine.SetupGet(m => m.IsLinux).Returns(true);
         machine.SetupGet(m => m.IsPrivileged).Returns(true);
         users.Setup(u => u.Normal()).Returns(["alice"]);
-        engine = new(catalog.Object, files.Object, archive.Object, states.Object, users.Object, paths.Object, machine.Object, new ByteSizes(), log.Object);
+        resources.Setup(r => r.Text("uninstall/prelude.sh")).Returns("PRELUDE\n");
+        runner.Setup(r => r.Run(It.IsAny<ProcessCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new ProcessResult(0, string.Empty, string.Empty));
+        foreach ((Mock<IBundle> bundle, Mock<IBundleState> state, string name) in new[] { (git, gitState, "git"), (dev, devState, "dev") })
+        {
+            bundle.Setup(b => b.Script(It.IsAny<UninstallContext>())).Returns(() =>
+            {
+                UninstallScript script = new();
+                script.Remove($"/opt/{name}");
+                return script;
+            });
+            state.Setup(s => s.PathOf("uninstall.sh")).Returns(directory.Combine("state", name, "uninstall.sh"));
+        }
+
+        engine = new(catalog.Object, files.Object, archive.Object, states.Object, users.Object, paths.Object, machine.Object, runner.Object, resources.Object, new ByteSizes(), log.Object);
     }
 
     public void Dispose()
         => directory.Dispose();
+
+    private bool RanUninstall(ProcessCommand command, string name)
+        => command.FileName == "bash" && command.Arguments.SequenceEqual([directory.Combine("state", name, "uninstall.sh")]);
+
+    private void OnUninstall(string name, Action action)
+        => runner.Setup(r => r.Run(It.Is<ProcessCommand>(command => RanUninstall(command, name)), It.IsAny<CancellationToken>())).Callback(action).ReturnsAsync(new ProcessResult(0, string.Empty, string.Empty));
+
+    private void VerifyUninstalled(string name, Times times)
+        => runner.Verify(r => r.Run(It.Is<ProcessCommand>(command => RanUninstall(command, name)), It.IsAny<CancellationToken>()), times);
 
     private BundleFile Bundle(string name, params int[] sizes)
     {
@@ -97,6 +121,48 @@ public sealed class BundleEngineTests : IDisposable
         Assert.Equal(new DateTime(2026, 10, 30, 9, 19, 0), list[0].FileModified);
         Assert.Equal(BundleStanding.NotBuilt, list[1].State);
         Assert.Null(list[1].FileModified);
+    }
+
+    [Theory]
+    [InlineData(1, "Outdated")]
+    [InlineData(0, "Installed")]
+    [InlineData(-1, "Installed")]
+    public void List_InstalledBundle_IsOutdatedOnlyWhenTheFileIsNewerThanTheInstall(int minutesAfterInstall, string standing)
+    {
+        DateTime installedAt = new(2026, 10, 30, 9, 0, 0);
+        BundleFile built = HaveBuilt("git");
+        files.Setup(f => f.Find("git")).Returns(built with { Modified = installedAt.AddMinutes(minutesAfterInstall) });
+        files.Setup(f => f.Find("dev")).Returns((BundleFile?)null);
+        gitState.SetupGet(s => s.IsInstalled).Returns(true);
+        gitState.SetupGet(s => s.InstalledAt).Returns(installedAt);
+
+        Assert.Equal(Enum.Parse<BundleStanding>(standing), engine.List()[0].State);
+    }
+
+    [Fact]
+    public void List_InstalledBundleWithoutAnInstallTime_IsInstalled()
+    {
+        DateTime modified = new(2026, 10, 30, 9, 0, 0);
+        BundleFile built = HaveBuilt("git");
+        files.Setup(f => f.Find("git")).Returns(built with { Modified = modified });
+        files.Setup(f => f.Find("dev")).Returns((BundleFile?)null);
+        gitState.SetupGet(s => s.IsInstalled).Returns(true);
+        gitState.SetupGet(s => s.InstalledAt).Returns((DateTime?)null);
+
+        Assert.Equal(BundleStanding.Installed, engine.List()[0].State);
+    }
+
+    [Fact]
+    public void List_InstalledBundleWhoseNewerFileIsIncomplete_IsInstalled()
+    {
+        DateTime installedAt = new(2026, 10, 30, 9, 0, 0);
+        BundleFile built = HaveBuilt("git");
+        files.Setup(f => f.Find("git")).Returns(built with { Modified = installedAt.AddHours(1), Problem = "part 2 is missing" });
+        files.Setup(f => f.Find("dev")).Returns((BundleFile?)null);
+        gitState.SetupGet(s => s.IsInstalled).Returns(true);
+        gitState.SetupGet(s => s.InstalledAt).Returns(installedAt);
+
+        Assert.Equal(BundleStanding.Installed, engine.List()[0].State);
     }
 
     [Fact]
@@ -288,18 +354,18 @@ public sealed class BundleEngineTests : IDisposable
         dev.SetupGet(b => b.Order).Returns(20);
         archive.Setup(a => a.Verify(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         List<string> order = [];
-        git.Setup(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>())).Callback(() =>
+        OnUninstall("git", () =>
         {
             order.Add("uninstall git");
             gitState.SetupGet(s => s.IsInstalled).Returns(false);
-        }).Returns(Task.CompletedTask);
+        });
         git.Setup(b => b.Install(It.IsAny<InstallContext>(), It.IsAny<CancellationToken>())).Callback(() => order.Add("install git")).Returns(Task.CompletedTask);
         dev.Setup(b => b.Install(It.IsAny<InstallContext>(), It.IsAny<CancellationToken>())).Callback(() => order.Add("install dev")).Returns(Task.CompletedTask);
 
         await engine.Reinstall(["git", "dev"], new());
 
         Assert.Equal(["uninstall git", "install git", "install dev"], order);
-        dev.Verify(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>()), Times.Never);
+        VerifyUninstalled("dev", Times.Never());
     }
 
     [Fact]
@@ -311,7 +377,7 @@ public sealed class BundleEngineTests : IDisposable
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Reinstall(["git"], new()));
 
-        git.Verify(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>()), Times.Never);
+        VerifyUninstalled("git", Times.Never());
         git.Verify(b => b.Install(It.IsAny<InstallContext>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -323,7 +389,7 @@ public sealed class BundleEngineTests : IDisposable
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Reinstall(["git"], new()));
 
-        git.Verify(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>()), Times.Never);
+        VerifyUninstalled("git", Times.Never());
     }
 
     [Fact]
@@ -334,7 +400,7 @@ public sealed class BundleEngineTests : IDisposable
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => engine.Reinstall(["git"], new() { Confirm = _ => Task.FromResult(false) }));
 
-        git.Verify(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>()), Times.Never);
+        VerifyUninstalled("git", Times.Never());
     }
 
     [Fact]
@@ -398,7 +464,7 @@ public sealed class BundleEngineTests : IDisposable
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Uninstall(["git"], new()));
 
         Assert.Contains("dev", error.Message);
-        git.Verify(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>()), Times.Never);
+        VerifyUninstalled("git", Times.Never());
     }
 
     [Fact]
@@ -419,8 +485,8 @@ public sealed class BundleEngineTests : IDisposable
         git.SetupGet(b => b.Order).Returns(10);
         dev.SetupGet(b => b.Order).Returns(20);
         List<string> order = [];
-        git.Setup(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>())).Callback(() => order.Add("git")).Returns(Task.CompletedTask);
-        dev.Setup(b => b.Uninstall(It.IsAny<UninstallContext>(), It.IsAny<CancellationToken>())).Callback(() => order.Add("dev")).Returns(Task.CompletedTask);
+        OnUninstall("git", () => order.Add("git"));
+        OnUninstall("dev", () => order.Add("dev"));
 
         await engine.Uninstall(["git", "dev"], new());
 
@@ -573,5 +639,63 @@ public sealed class BundleEngineTests : IDisposable
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Install(["git"], new()));
 
         Assert.Contains("git.bundle.001", error.Message);
+    }
+
+    [Fact]
+    public async Task Install_RecordsTheUninstallScriptOfTheInstalledVersionBeforeMarkingItInstalled()
+    {
+        HaveBuilt("git");
+        gitState.SetupGet(s => s.IsInstalled).Returns(false);
+        archive.Setup(a => a.Verify(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        List<string> order = [];
+        gitState.Setup(s => s.Write("uninstall.sh", It.IsAny<string>())).Callback(() => order.Add("script"));
+        gitState.Setup(s => s.Begin(It.IsAny<IEnumerable<string>>())).Callback(() => order.Add("begin"));
+
+        await engine.Install(["git"], new());
+
+        Assert.Equal(["script", "begin"], order);
+        gitState.Verify(s => s.Write("uninstall.sh", It.Is<string>(text => text.StartsWith("#!/bin/bash\n", StringComparison.Ordinal) && text.Contains("PRELUDE") && text.EndsWith("b_rm '/opt/git'\n", StringComparison.Ordinal))), Times.Once);
+    }
+
+    [Fact]
+    public async Task Uninstall_RunsTheScriptRecordedByTheInstallAndNotTheCurrentRulesOfTheBundle()
+    {
+        gitState.SetupGet(s => s.IsInstalled).Returns(true);
+        gitState.SetupGet(s => s.Users).Returns([]);
+        gitState.Setup(s => s.Read("uninstall.sh")).Returns("#!/bin/bash\nrecorded\n");
+
+        await engine.Uninstall(["git"], new());
+
+        VerifyUninstalled("git", Times.Once());
+        git.Verify(b => b.Script(It.IsAny<UninstallContext>()), Times.Never);
+        gitState.Verify(s => s.Write("uninstall.sh", It.IsAny<string>()), Times.Never);
+        gitState.Verify(s => s.End(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Uninstall_AnInstallWithoutARecordedScript_UsesTheCurrentRulesAndSaysSo()
+    {
+        gitState.SetupGet(s => s.IsInstalled).Returns(true);
+        gitState.SetupGet(s => s.Users).Returns(["bob"]);
+
+        await engine.Uninstall(["git"], new());
+
+        git.Verify(b => b.Script(It.Is<UninstallContext>(context => context.Users.SequenceEqual(new[] { "alice", "bob" }))), Times.Once);
+        gitState.Verify(s => s.Write("uninstall.sh", It.Is<string>(text => text.Contains("b_rm '/opt/git'"))), Times.Once);
+        VerifyUninstalled("git", Times.Once());
+        log.Verify(l => l.Write(LogLevel.Info, It.Is<string>(text => text.Contains("recorded no uninstall script"))), Times.Once);
+    }
+
+    [Fact]
+    public async Task Uninstall_ScriptThatFails_KeepsTheInstallRecords()
+    {
+        gitState.SetupGet(s => s.IsInstalled).Returns(true);
+        gitState.SetupGet(s => s.Users).Returns([]);
+        gitState.Setup(s => s.Read("uninstall.sh")).Returns("#!/bin/bash\nrecorded\n");
+        runner.Setup(r => r.Run(It.Is<ProcessCommand>(command => RanUninstall(command, "git")), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("script failed"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => engine.Uninstall(["git"], new()));
+
+        gitState.Verify(s => s.End(), Times.Never);
     }
 }

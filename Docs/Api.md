@@ -8,7 +8,7 @@ One executable. Without arguments it opens the window; with arguments it runs a 
 
 | Command | Where | What it does |
 |---|---|---|
-| `list` | anywhere | One row per bundle: `not built`, `available` (file in the Bundles folder) or `installed`, with its target system and when the bundle file was last changed. |
+| `list` | anywhere | One row per bundle: `not built`, `available` (file in the Bundles folder), `installed` or `outdated` (installed, but the bundle file was changed after the install), with its target system and when the bundle file was last changed. |
 | `build <bundle...\|all>` | online computer | Downloads the latest stable version of everything the bundle needs and packs it into `<name>.bundle` in the Bundles folder (or `<name>.bundle.001`, `.002`, ... with `--max-size`), replacing the files there, or does nothing if they already hold exactly that in that layout. |
 | `install <bundle...>` | offline computer | Installs the bundle file found in the Bundles folder, after the bundles it needs. A bundle that is installed already is skipped: reinstall it to use a different file. |
 | `reinstall <bundle...>` | offline computer | Uninstalls the bundles that are installed and installs all of them again from their files, asking once. Refuses before changing anything if another installed bundle needs one of them. |

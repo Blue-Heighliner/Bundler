@@ -63,9 +63,11 @@ internal interface IBundleEngine
 }
 
 /// <inheritdoc />
-internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, IBundleArchive archive, IStateStore states, IUsers users, IPaths paths, IMachine machine, IByteSizes sizes, ILog log) : IBundleEngine
+internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, IBundleArchive archive, IStateStore states, IUsers users, IPaths paths, IMachine machine, IProcessRunner runner, IResources resources, IByteSizes sizes, ILog log) : IBundleEngine
 {
     private readonly long minimumPart = 1_000_000;
+
+    private readonly string uninstallScriptFile = "uninstall.sh";
 
     /// <inheritdoc />
     public IReadOnlyList<BundleStatus> List()
@@ -187,7 +189,13 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
             log.Step($"Uninstalling {bundle.Name}");
             IBundleState state = states.Get(bundle.Name);
             IReadOnlyList<string> accounts = users.Normal().Concat(state.Users).Distinct().ToList();
-            await bundle.Uninstall(new() { State = state, Users = accounts }, cancellation);
+            if (state.Read(uninstallScriptFile) is null)
+            {
+                log.Info($"the install of {bundle.Name} recorded no uninstall script, so the current rules of Bundler remove it");
+                state.Write(uninstallScriptFile, Script(bundle, new() { State = state, Users = accounts }));
+            }
+
+            await runner.Run(new() { FileName = "bash", Arguments = [state.PathOf(uninstallScriptFile)], StreamOutput = true }, cancellation);
             state.End();
             log.Step($"Uninstalled {bundle.Name}");
         }
@@ -209,13 +217,14 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
     private BundleStatus Status(IBundle bundle)
     {
         BundleFile? file = files.Find(bundle.Name);
+        IBundleState state = states.Get(bundle.Name);
         return new()
         {
             Name = bundle.Name,
             Description = bundle.Description,
             Target = bundle.Target,
             Requires = bundle.Requires,
-            State = states.Get(bundle.Name).IsInstalled ? BundleStanding.Installed : file is null ? BundleStanding.NotBuilt : BundleStanding.Available,
+            State = state.IsInstalled ? (file is not null && file.Problem is null && state.InstalledAt is DateTime installedAt && file.Modified > installedAt ? BundleStanding.Outdated : BundleStanding.Installed) : file is null ? BundleStanding.NotBuilt : BundleStanding.Available,
             FileModified = file?.Modified,
             FileCount = file?.Paths.Count ?? 0,
             FileProblem = file?.Problem,
@@ -312,6 +321,9 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
     private string Describe(BundleFile file)
         => file.IsSplit ? $"{file.Paths.Count} parts, {Path.GetFileName(file.Paths[0])} to {Path.GetFileName(file.Paths[^1])} ({sizes.Format(file.Length)})" : $"{Path.GetFileName(file.Paths[0])} ({sizes.Format(file.Length)})";
 
+    private string Script(IBundle bundle, UninstallContext context)
+        => bundle.Script(context).Render(bundle.Name, resources.Text("uninstall/prelude.sh"));
+
     private async Task InstallOne(IBundle bundle, CancellationToken cancellation)
     {
         BundleFile file = files.Find(bundle.Name)!;
@@ -350,6 +362,7 @@ internal sealed class BundleEngine(IBundleCatalog catalog, IBundleFiles files, I
             log.Step($"Installing {bundle.Name}");
             IReadOnlyList<string> accounts = users.Normal();
             await bundle.Install(new() { Payload = work, State = state, Users = accounts, Info = info }, cancellation);
+            state.Write(uninstallScriptFile, Script(bundle, new() { State = state, Users = accounts }));
             state.Begin(accounts);
             log.Step($"Installed {bundle.Name}");
         }

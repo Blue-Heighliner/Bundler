@@ -26,27 +26,4 @@ public sealed class TextBlocksTests
 
         Assert.Equal(["# bundler tag begin", "new", "# bundler tag end"], File.ReadAllLines(path));
     }
-
-    [Fact]
-    public void Remove_OnlyRemovesTheTaggedBlock()
-    {
-        using TempDirectory directory = new();
-        string path = directory.Combine("rc");
-        blocks.Add(path, "one", ["1"]);
-        blocks.Add(path, "two", ["2"]);
-
-        blocks.Remove(path, "one");
-
-        Assert.Equal(["# bundler two begin", "2", "# bundler two end"], File.ReadAllLines(path));
-    }
-
-    [Fact]
-    public void Remove_MissingFile_DoesNothing()
-    {
-        using TempDirectory directory = new();
-
-        blocks.Remove(directory.Combine("none"), "tag");
-
-        Assert.False(File.Exists(directory.Combine("none")));
-    }
 }

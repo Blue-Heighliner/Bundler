@@ -17,12 +17,11 @@ internal interface INuGetBundleInstaller
     Task Install(NuGetBundleSpec spec, InstallContext context, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Removes the template packs and the package versions this bundle added.
+    /// Adds the steps that remove the template packs and the package versions this bundle added.
     /// </summary>
-    /// <param name="context">What the uninstall needs.</param>
-    /// <param name="cancellation">Stops the work when cancelled.</param>
-    /// <returns>A task that completes when they are removed.</returns>
-    Task Uninstall(UninstallContext context, CancellationToken cancellation = default);
+    /// <param name="script">The uninstall script of the bundle.</param>
+    /// <param name="context">What the script needs.</param>
+    void Uninstall(UninstallScript script, UninstallContext context);
 }
 
 /// <inheritdoc />
@@ -84,17 +83,17 @@ internal sealed class NuGetBundleInstaller(INuGetFeed feed, INuGetBundleBuilder 
     }
 
     /// <inheritdoc />
-    public async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public void Uninstall(UninstallScript script, UninstallContext context)
     {
         foreach (string line in context.State.Lines("templates-owned"))
         {
             string[] parts = line.Split(' ', 2);
             if (parts.Length == 2)
             {
-                await feed.UninstallTemplate(parts[0], parts[1], cancellation);
+                script.Add("run-as", parts[0], "dotnet", "new", "uninstall", parts[1]);
             }
         }
 
-        feed.Remove(context.State);
+        script.Add("feed-remove", feed.Directory);
     }
 }

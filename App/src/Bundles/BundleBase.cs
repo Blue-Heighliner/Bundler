@@ -49,12 +49,13 @@ internal interface IBundle
     Task Install(InstallContext context, CancellationToken cancellation = default);
 
     /// <summary>
-    /// Removes what the bundle installed or replaced itself.
+    /// Describes how to remove what the bundle installed or replaced itself, from the install records. The engine asks for it right after an
+    /// install and keeps it with the records, so a later uninstall runs the steps of the installed version, and asks again only for an install
+    /// that recorded no script.
     /// </summary>
-    /// <param name="context">What the uninstall needs.</param>
-    /// <param name="cancellation">Stops the uninstall when cancelled.</param>
-    /// <returns>A task that completes when the bundle is removed.</returns>
-    Task Uninstall(UninstallContext context, CancellationToken cancellation = default);
+    /// <param name="context">What the script needs.</param>
+    /// <returns>The steps that remove the bundle.</returns>
+    UninstallScript Script(UninstallContext context);
 }
 
 /// <summary>
@@ -91,5 +92,5 @@ internal abstract class BundleBase : IBundle
     public abstract Task Install(InstallContext context, CancellationToken cancellation = default);
 
     /// <inheritdoc />
-    public abstract Task Uninstall(UninstallContext context, CancellationToken cancellation = default);
+    public abstract UninstallScript Script(UninstallContext context);
 }

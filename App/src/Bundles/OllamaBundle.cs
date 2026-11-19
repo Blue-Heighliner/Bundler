@@ -106,48 +106,40 @@ internal sealed class OllamaBundle(
     }
 
     /// <inheritdoc />
-    public override async Task Uninstall(UninstallContext context, CancellationToken cancellation = default)
+    public override UninstallScript Script(UninstallContext context)
     {
-        await systemd.Control("disable --now", "ollama", cancellation);
-        File.DeleteIfPresent("/etc/systemd/system/ollama.service");
-        File.DeleteIfPresent(Path.Combine(dropInFolder, "zz-bundler.conf"));
-        DeleteIfEmpty(dropInFolder);
-        await systemd.Reload(cancellation);
+        UninstallScript script = new();
+        script.Add("systemctl", "disable --now", "ollama");
+        script.Remove("/etc/systemd/system/ollama.service");
+        script.Remove(Path.Combine(dropInFolder, "zz-bundler.conf"));
+        script.RemoveEmpty(dropInFolder);
+        script.Add("daemon-reload");
         if (!context.State.IsOwned("ollama"))
         {
-            log.Info("Ollama was already on this computer and was not installed by this bundle, so it is left in place");
+            script.Info("Ollama was already on this computer and was not installed by this bundle, so it is left in place");
         }
         else
         {
-            await RemoveFiles(context);
+            AddFileRemoval(script, context);
         }
 
-        await aptInstaller.RemoveAdded(context.State, cancellation);
+        script.Add("apt-remove-added");
+        return script;
     }
 
-    private async Task RemoveFiles(UninstallContext context)
+    private void AddFileRemoval(UninstallScript script, UninstallContext context)
     {
         string prefix = context.State.Read("ollama-prefix")?.Trim() ?? "/usr";
-        File.DeleteIfPresent(Path.Combine(prefix, "bin", "ollama"));
-        if (Directory.Exists(Path.Combine(prefix, "lib", "ollama")))
-        {
-            Directory.Delete(Path.Combine(prefix, "lib", "ollama"), recursive: true);
-        }
-
+        script.Remove(Path.Combine(prefix, "bin", "ollama"));
+        script.RemoveTree(Path.Combine(prefix, "lib", "ollama"));
         string models = "/usr/share/ollama/.ollama/models";
-        bool hasModels = new[] { "manifests", "manifests-v2" }.Select(folder => Path.Combine(models, folder)).Where(Directory.Exists).Any(folder => Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Any());
-        if (hasModels)
+        string[] folders = [Path.Combine(models, "manifests"), Path.Combine(models, "manifests-v2")];
+        script.IfFiles(true, folders, then => then.Warn("Ollama models are still in /usr/share/ollama (the ollama user is kept). Delete that folder by hand if you do not need them."));
+        script.IfFiles(false, folders, then =>
         {
-            log.Warn("Ollama models are still in /usr/share/ollama (the ollama user is kept). Delete that folder by hand if you do not need them.");
-        }
-        else
-        {
-            await runner.Try("userdel", ["ollama"]);
-            if (Directory.Exists("/usr/share/ollama"))
-            {
-                Directory.Delete("/usr/share/ollama", recursive: true);
-            }
-        }
+            then.Add("run", "userdel", "ollama");
+            then.RemoveTree("/usr/share/ollama");
+        });
     }
 
     private bool WriteIfChanged(string path, string text)

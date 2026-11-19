@@ -118,21 +118,21 @@ public sealed class PythonAndNodeBundleTests : IDisposable
     }
 
     [Fact]
-    public async Task Uninstall_RemovesWhatTheToolInstallerPutThere()
+    public void Script_LetsTheToolInstallerAddItsSteps()
     {
         UninstallContext context = new() { State = state, Users = [] };
 
-        await python.Uninstall(context);
-        await node.Uninstall(context);
+        python.Script(context);
+        node.Script(context);
 
-        tool.Verify(t => t.Uninstall(state), Times.Exactly(2));
+        tool.Verify(t => t.Uninstall(It.IsAny<UninstallScript>(), state), Times.Exactly(2));
     }
 
     [Fact]
-    public async Task Uninstall_AProgramThatWasThereBefore_IsLeftInPlaceAndSaid()
+    public void Script_AProgramThatWasThereBefore_IsLeftInPlaceAndSaid()
     {
-        await node.Uninstall(new() { State = state, Users = [] });
+        IReadOnlyList<string> lines = node.Script(new() { State = state, Users = [] }).Lines();
 
-        log.Verify(l => l.Write(LogLevel.Info, "Node.js was already on this computer and was not installed by this bundle, so it is left in place"), Times.Once);
+        Assert.Contains("info Node.js was already on this computer and was not installed by this bundle, so it is left in place", lines);
     }
 }

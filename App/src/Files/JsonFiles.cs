@@ -14,15 +14,6 @@ internal interface IJsonFiles
     /// <returns><see langword="true" /> when the file was written.</returns>
     /// <exception cref="InvalidOperationException">The file exists but is not a JSON object; it is left alone.</exception>
     bool Set(string path, JsonObject updates, string? skipWhenPresent = null);
-
-    /// <summary>
-    /// Removes the keys of <paramref name="expected" /> whose current value is still the one given, and deletes the file when
-    /// nothing is left in it.
-    /// </summary>
-    /// <param name="path">The file; nothing happens when it does not exist.</param>
-    /// <param name="expected">The keys and the values they were given.</param>
-    /// <returns><see langword="true" /> when the file was changed.</returns>
-    bool UnsetMatching(string path, JsonObject expected);
 }
 
 /// <inheritdoc />
@@ -56,33 +47,6 @@ internal sealed class JsonFiles : IJsonFiles
 
         Save(path, merged);
         return true;
-    }
-
-    /// <inheritdoc />
-    public bool UnsetMatching(string path, JsonObject expected)
-    {
-        if (!File.Exists(path))
-        {
-            return false;
-        }
-
-        JsonObject data = Load(path);
-        bool changed = false;
-        foreach ((string key, JsonNode? value) in expected)
-        {
-            if (data.TryGetPropertyValue(key, out JsonNode? current) && JsonNode.DeepEquals(current, value))
-            {
-                data.Remove(key);
-                changed = true;
-            }
-        }
-
-        if (changed)
-        {
-            Save(path, data);
-        }
-
-        return changed;
     }
 
     private JsonObject Load(string path)

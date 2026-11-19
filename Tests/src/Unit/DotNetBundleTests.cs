@@ -3,6 +3,7 @@ namespace BlueHeighliner.Bundler.Tests;
 public sealed class DotNetBundleTests : IDisposable
 {
     private readonly TempDirectory directory = new();
+    private readonly UninstallHarness harness = new();
     private readonly Mock<IDotNetSdks> sdks = new();
     private readonly Mock<IDotNetFiles> files = new();
     private readonly Mock<INuGetFeed> feed = new();
@@ -27,7 +28,13 @@ public sealed class DotNetBundleTests : IDisposable
     }
 
     public void Dispose()
-        => directory.Dispose();
+    {
+        harness.Dispose();
+        directory.Dispose();
+    }
+
+    private Task Uninstall(UninstallContext context)
+        => harness.Run(state, bundle.Script(context), "dotnet");
 
     private void Tarball(string sdk, string runtime, string muxer)
     {
@@ -134,7 +141,7 @@ public sealed class DotNetBundleTests : IDisposable
         directory.Write("usr/share/dotnet/dotnet", "their muxer");
         await bundle.Install(Install());
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        await Uninstall(new() { State = state, Users = [] });
 
         Assert.False(Directory.Exists(Root("sdk", "10.0.404")));
         Assert.False(Directory.Exists(Root("sdk", "11.0.100")));
@@ -150,7 +157,7 @@ public sealed class DotNetBundleTests : IDisposable
     {
         await bundle.Install(Install());
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        await Uninstall(new() { State = state, Users = [] });
 
         Assert.False(Directory.Exists(files.Object.Root));
         Assert.Null(new FileInfo(files.Object.Link).LinkTarget);
@@ -163,7 +170,7 @@ public sealed class DotNetBundleTests : IDisposable
         File.CreateSymbolicLink(files.Object.Link, "/somewhere/else/dotnet");
         await bundle.Install(Install());
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        await Uninstall(new() { State = state, Users = [] });
 
         Assert.Equal("/somewhere/else/dotnet", new FileInfo(files.Object.Link).LinkTarget);
     }
@@ -174,7 +181,7 @@ public sealed class DotNetBundleTests : IDisposable
         directory.Write("usr/share/dotnet/sdk/10.0.403/sdk.dll", "old");
         state.MarkOwned("dotnet");
 
-        await bundle.Uninstall(new() { State = state, Users = [] });
+        await Uninstall(new() { State = state, Users = [] });
 
         Assert.False(Directory.Exists(files.Object.Root));
     }

@@ -3,6 +3,7 @@ namespace BlueHeighliner.Bundler.Tests;
 public sealed class OllamaModelFilesTests : IDisposable
 {
     private readonly TempDirectory directory = new();
+    private readonly UninstallHarness harness = new();
     private readonly Mock<IProcessRunner> runner = new();
     private readonly Mock<ISystemd> systemd = new();
     private readonly Mock<ILog> log = new();
@@ -35,7 +36,18 @@ public sealed class OllamaModelFilesTests : IDisposable
     }
 
     public void Dispose()
-        => directory.Dispose();
+    {
+        harness.Dispose();
+        directory.Dispose();
+    }
+
+    private async Task<string> Uninstall(BundleState from, string fallback)
+    {
+        UninstallScript script = new();
+        string name = files.Uninstall(script, from, fallback);
+        await harness.Run(from, script, "model");
+        return name;
+    }
 
     private static string Hex(string seed)
         => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(seed)));
@@ -133,7 +145,7 @@ public sealed class OllamaModelFilesTests : IDisposable
     {
         await files.Install(Payload("m:latest", "weights"));
 
-        string name = await files.Uninstall(state, "fallback:1");
+        string name = await Uninstall(state, "fallback:1");
 
         Assert.Equal("m:latest", name);
         Assert.False(File.Exists(Manifest("m:latest")));
@@ -148,7 +160,7 @@ public sealed class OllamaModelFilesTests : IDisposable
         BundleState second = new(directory.Combine("state2"));
         await files.Install(Payload("m:latest", "weights") with { State = second });
 
-        await files.Uninstall(second, "fallback:1");
+        await Uninstall(second, "fallback:1");
 
         Assert.True(File.Exists(Manifest("m:latest")));
         Assert.True(File.Exists(Blob("weights")));
@@ -156,7 +168,7 @@ public sealed class OllamaModelFilesTests : IDisposable
 
     [Fact]
     public async Task Uninstall_NoRecordedModel_ReportsTheFallbackName()
-        => Assert.Equal("fallback:1", await files.Uninstall(state, "fallback:1"));
+        => Assert.Equal("fallback:1", await Uninstall(state, "fallback:1"));
 
     [Fact]
     public async Task Verify_ListedModel_Passes()

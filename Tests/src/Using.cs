@@ -1,3 +1,4 @@
+global using System.Diagnostics;
 global using System.Formats.Tar;
 global using System.IO.Compression;
 global using System.Text.RegularExpressions;
@@ -9,6 +10,7 @@ global using Avalonia.Controls;
 global using Avalonia.Headless;
 global using Avalonia.Headless.XUnit;
 global using Avalonia.Interactivity;
+global using Avalonia.Media;
 global using Avalonia.VisualTree;
 global using BlueHeighliner.Bundler;
 global using Microsoft.Extensions.DependencyInjection;
